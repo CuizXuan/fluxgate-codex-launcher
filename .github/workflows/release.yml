@@ -1,0 +1,44 @@
+name: Release Windows Launcher
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Build and validate deliverables
+        shell: powershell
+        run: |
+          $version = "${{ github.ref_name }}".TrimStart('v')
+          .\build\build-release.ps1 -Version $version
+
+      - name: Confirm no official Codex binaries are packaged
+        shell: powershell
+        run: |
+          $unexpected = Get-ChildItem release-assets -File -Recurse | Where-Object {
+            $_.Name -match '^codex(\.exe)?$|app\.asar'
+          }
+          if ($unexpected) { throw "Official Codex binary found in release assets" }
+
+      - name: Publish GitHub Release
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ github.ref_name }}" release-assets/* `
+            --title "FluxGate Codex Launcher ${{ github.ref_name }}" `
+            --notes "Open-source Windows launcher, CLI installer, desktop Bridge and mobile web client. This release does not contain or redistribute OpenAI Codex Desktop or Codex CLI binaries; the installer reuses an existing CLI or downloads it from official OpenAI distribution channels at install time."

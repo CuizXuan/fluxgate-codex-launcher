@@ -1,0 +1,6 @@
+release-assets/
+bridge/node_modules/
+bridge/*.log
+*.log
+.env
+.DS_Store

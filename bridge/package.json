@@ -1,0 +1,20 @@
+{
+  "name": "fluxgate-bridge",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "description": "FluxGateAI Bridge desktop client",
+  "license": "AGPL-3.0-or-later",
+  "repository": "https://github.com/CuizXuan/fluxgate-codex-launcher",
+  "main": "fluxgate-bridge.mjs",
+  "scripts": {
+    "start": "node fluxgate-bridge.mjs",
+    "preview:mobile": "node mobile-mock-server.mjs"
+  },
+  "dependencies": {
+    "ws": "^8.21.1"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0E1116">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>FluxGateAI Codex Connect</title>
+<style>
+  :root{
+    --bg:#0e1518; --card:#162126; --line:#304047; --text:#f1f5f5; --muted:#9aabb0;
+    --primary:#19b8a6; --accent:#e5a742; --ok:#42c66b; --err:#f0655b; --safe:calc(env(safe-area-inset-bottom) + 10px);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;min-height:100%;background:var(--bg);color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    -webkit-font-smoothing:antialiased;overscroll-behavior:none;overflow:hidden}
+  #app{height:100%;height:100dvh;min-height:100%;display:flex;flex-direction:column;width:100%;max-width:560px;margin:0 auto}
+  .hidden{display:none!important}
+  .grad{background:var(--primary)}
+  button{font-family:inherit;cursor:pointer;border:none}
+  input,textarea{font-family:inherit}
+
+  /* ---------- 登录 ---------- */
+  #login{flex:1;display:flex;flex-direction:column;justify-content:center;padding:calc(env(safe-area-inset-top) + 28px) 24px var(--safe);overflow-y:auto}
+  .logo{width:64px;height:64px;border-radius:14px;display:flex;align-items:center;justify-content:center;
+    color:#fff;margin:0 auto 18px;box-shadow:0 8px 28px rgba(25,184,166,.26)}
+  .logo svg{width:42px;height:42px;display:block}
+  .brand{text-align:center;font-size:22px;font-weight:800;letter-spacing:0}
+  .brand small{display:block;font-size:12px;font-weight:500;color:var(--muted);margin-top:6px;letter-spacing:0}
+  .field{margin-top:16px}
+  .field label{display:block;font-size:12px;color:var(--muted);margin:0 0 7px 2px}
+  .field input{width:100%;padding:14px 14px;border-radius:12px;background:#0D1117;border:1px solid var(--line);
+    color:var(--text);font-size:16px;outline:none;transition:border-color .15s}
+  .field input:focus{border-color:var(--primary)}
+  .btn{width:100%;padding:15px;border-radius:12px;color:#fff;font-size:16px;font-weight:700;margin-top:22px;
+    transition:opacity .15s}
+  .btn:active{opacity:.85}
+  .btn[disabled]{opacity:.5}
+  .err{color:var(--err);font-size:13px;margin-top:14px;text-align:center;min-height:18px;line-height:1.5}
+  .sub{margin-top:22px;text-align:center;font-size:13px;color:var(--muted)}
+  .sub a{color:var(--primary);text-decoration:none;font-weight:600}
+  .notice{margin-top:26px;font-size:11px;line-height:1.7;color:#5c6672;text-align:center;padding:0 6px}
+
+  /* ---------- 顶栏 ---------- */
+  .top{display:flex;align-items:center;gap:12px;padding:calc(env(safe-area-inset-top) + 12px) 16px 12px;
+    border-bottom:1px solid var(--line);background:rgba(14,17,22,.85);backdrop-filter:blur(10px);position:sticky;top:0;z-index:5}
+  .top .t-title{font-size:16px;font-weight:700;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .top .t-sub{font-size:11px;color:var(--muted);font-weight:400}
+  .iconbtn{width:44px;height:44px;border-radius:8px;background:transparent;color:var(--muted);font-size:20px;
+    display:flex;align-items:center;justify-content:center}
+  .iconbtn:active{background:#1F2630}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--muted);display:inline-block;margin-right:6px;vertical-align:middle}
+  .dot.on{background:var(--ok);box-shadow:0 0 8px var(--ok)}
+
+  /* ---------- 设备列表 ---------- */
+  #devices{flex:1;display:flex;flex-direction:column}
+  .dev-scroll{flex:1;overflow-y:auto;padding:16px}
+  .dev-hint{font-size:12px;color:var(--muted);margin:2px 2px 14px}
+  .dev{display:flex;align-items:center;gap:14px;width:100%;padding:16px;border-radius:8px;background:var(--card);
+    border:1px solid var(--line);margin-bottom:12px;color:var(--text);text-align:left;transition:transform .08s}
+  .dev:active{transform:scale(.985)}
+  .dev-ic{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;color:#fff;flex-shrink:0}
+  .dev-name{font-size:15px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .dev-meta{font-size:12px;color:var(--muted);margin-top:3px}
+  .dev-go{color:var(--muted);font-size:20px}
+  .empty{text-align:center;color:var(--muted);padding:60px 30px;font-size:14px;line-height:1.9}
+  .empty .big{font-size:40px;margin-bottom:10px;opacity:.5}
+  .empty code{background:#0D1117;border:1px solid var(--line);border-radius:6px;padding:2px 7px;font-size:12px;color:var(--primary)}
+
+  /* ---------- 聊天 ---------- */
+  #chat{flex:1;display:flex;flex-direction:column;min-height:0}
+  .msgs{flex:1;overflow-y:auto;padding:16px 14px 8px;display:flex;flex-direction:column;gap:12px}
+  .msg{max-width:88%;padding:11px 14px;border-radius:8px;font-size:14.5px;line-height:1.55;white-space:pre-wrap;overflow-wrap:anywhere}
+  .msg.me{align-self:flex-end;color:#fff;border-bottom-right-radius:5px}
+  .msg.bot{align-self:flex-start;background:var(--card);border:1px solid var(--line);border-bottom-left-radius:5px}
+  .msg.bot.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px;color:#c9d3de}
+  .msg.sys{align-self:center;background:transparent;color:var(--muted);font-size:12px;padding:4px 10px}
+  .msg .cursor{display:inline-block;width:7px;height:15px;background:var(--primary);vertical-align:text-bottom;
+    margin-left:2px;animation:blink 1s steps(2) infinite;border-radius:1px}
+  @keyframes blink{0%{opacity:1}50%{opacity:0}}
+  .composer{border-top:1px solid var(--line);padding:10px 12px var(--safe);background:var(--bg);display:flex;gap:10px;align-items:flex-end}
+  .composer textarea{flex:1;resize:none;max-height:120px;overflow-y:hidden;padding:12px 14px;border-radius:8px;background:#0D1117;
+    border:1px solid var(--line);color:var(--text);font-size:16px;outline:none;line-height:1.4}
+  .composer textarea:focus{border-color:var(--primary)}
+  .send{width:46px;height:46px;border-radius:8px;color:#fff;font-size:20px;flex-shrink:0;
+    display:flex;align-items:center;justify-content:center}
+  .send.stop{background:var(--err)!important}
+  .send[disabled]{opacity:.45}
+  .send:focus-visible,.iconbtn:focus-visible,.dev:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  @media (max-width:360px){
+    #login{padding-left:16px;padding-right:16px}
+    .logo{width:56px;height:56px;margin-bottom:14px}
+    .logo svg{width:36px;height:36px}
+    .brand{font-size:20px}
+    .dev-scroll{padding:12px}
+    .msgs{padding-left:10px;padding-right:10px}
+  }
+  @media (min-width:700px){
+    body{border-inline:1px solid #1d2a2f}
+    #login{padding-left:64px;padding-right:64px}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- 登录页 -->
+  <section id="login">
+    <div class="logo grad" aria-hidden="true"><svg viewBox="0 0 64 64"><path fill="#0e1518" d="M10 10h44v13H23v34H10z"/><path fill="#fff" d="M29 29h22v10H29z"/><path fill="#fff" d="m45 24 11 10-11 10z"/><circle cx="17" cy="17" r="4" fill="#fff"/></svg></div>
+    <div class="brand">FluxGateAI<small>Codex 手机端 · 远程连接你的电脑</small></div>
+    <div class="field">
+      <label for="u">FluxGateAI 账号</label>
+      <input id="u" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="用户名">
+    </div>
+    <div class="field">
+      <label for="p">密码</label>
+      <input id="p" type="password" autocomplete="current-password" placeholder="密码">
+    </div>
+    <button id="loginBtn" class="btn grad">登 录</button>
+    <div id="loginErr" class="err"></div>
+    <div class="sub">还没有账号？<a id="regLink" href="#" target="_blank" rel="noopener">注册 FluxGateAI 账号</a></div>
+    <div class="notice">消息通过 HTTPS / WSS 传输并按账号与设备隔离；Bridge 仅中转指令，不读取 Codex / OpenAI 登录凭证。当前非端到端加密。</div>
+  </section>
+
+  <!-- 设备列表页 -->
+  <section id="devices" class="hidden">
+    <div class="top">
+      <div style="flex:1">
+        <div class="t-title">选择设备</div>
+        <div class="t-sub"><span id="wsDot" class="dot"></span><span id="wsState">连接中…</span></div>
+      </div>
+      <button class="iconbtn" id="refreshBtn" title="刷新设备" aria-label="刷新设备">⟳</button>
+      <button class="iconbtn" id="logoutBtn" title="退出登录" aria-label="退出登录">↪</button>
+    </div>
+    <div class="dev-scroll">
+      <div class="dev-hint">这些是当前在线、已登录你账号的电脑。点按即可开始远程使用 Codex。</div>
+      <div id="devList"></div>
+    </div>
+  </section>
+
+  <!-- 聊天页 -->
+  <section id="chat" class="hidden">
+    <div class="top">
+      <button class="iconbtn" id="backBtn" title="返回设备列表" aria-label="返回设备列表">‹</button>
+      <div style="flex:1;min-width:0">
+        <div class="t-title" id="chatTitle">设备</div>
+        <div class="t-sub"><span id="chatDot" class="dot on"></span><span id="chatState">就绪</span></div>
+      </div>
+    </div>
+    <div class="msgs" id="msgs"></div>
+    <div class="composer">
+      <textarea id="input" rows="1" placeholder="给 Codex 发指令"></textarea>
+      <button class="send grad" id="sendBtn" title="发送" aria-label="发送">➤</button>
+    </div>
+  </section>
+
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var API_LOGIN = "/api/desktop/codex/login";
+  var REGISTER_URL = "https://api.fluxapi.cloud";
+  var $ = function(id){ return document.getElementById(id); };
+
+  var state = {
+    token: null,
+    ws: null,
+    devices: [],
+    device: null,      // {device_id, device_name}
+    sessionId: null,
+    running: false,
+    curBubble: null,    // streaming assistant bubble
+    reconnectTimer: null,
+    manualClose: false,
+    everOpened: false,
+    preOpenFails: 0
+  };
+
+  try { state.token = localStorage.getItem("fluxgate_bridge_token") || null; } catch(e){}
+  $("regLink").href = REGISTER_URL;
+
+  function show(id){
+    ["login","devices","chat"].forEach(function(s){
+      $(s).classList.toggle("hidden", s !== id);
+    });
+  }
+  function uuid(){
+    if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g,function(c){
+      var r = Math.random()*16|0, v = c==="x"?r:(r&0x3|0x8); return v.toString(16);
+    });
+  }
+  function colorFor(str){
+    var h=0; for (var i=0;i<str.length;i++) h=(h*31+str.charCodeAt(i))>>>0;
+    var hue=h%360; return "hsl("+hue+",55%,52%)";
+  }
+
+  /* ---------------- 登录 ---------------- */
+  function doLogin(){
+    var u=$("u").value.trim(), p=$("p").value;
+    if(!u||!p){ $("loginErr").textContent="请输入账号和密码"; return; }
+    var btn=$("loginBtn"); btn.disabled=true; btn.textContent="登录中…"; $("loginErr").textContent="";
+    fetch(API_LOGIN,{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({username:u,password:p})})
+    .then(function(r){ return r.json().catch(function(){ return {success:false,message:"服务器无响应"}; }); })
+    .then(function(j){
+      if(!j.success || !j.data || !j.data.access_token){
+        throw new Error(j.message || "登录失败");
+      }
+      state.token = j.data.access_token;
+      $("p").value="";
+      try{ localStorage.setItem("fluxgate_bridge_token", state.token); }catch(e){}
+      enterDevices();
+    })
+    .catch(function(e){ $("loginErr").textContent = e.message || "登录失败"; })
+    .finally(function(){ btn.disabled=false; btn.textContent="登 录"; });
+  }
+
+  function logout(){
+    state.manualClose=true;
+    if(state.ws){ try{ state.ws.close(); }catch(e){} }
+    state.token=null;
+    $("u").value=""; $("p").value="";
+    try{ localStorage.removeItem("fluxgate_bridge_token"); }catch(e){}
+    show("login");
+  }
+
+  /* ---------------- WebSocket ---------------- */
+  function wsUrl(){
+    var proto = location.protocol === "https:" ? "wss:" : "ws:";
+    return proto+"//"+location.host+"/api/desktop/bridge/phone?token="+encodeURIComponent(state.token);
+  }
+  function setWsState(on,label){
+    $("wsDot").classList.toggle("on",!!on);
+    $("wsState").textContent=label;
+  }
+  function enterDevices(){
+    show("devices");
+    setWsState(false,"连接中…");
+    state.everOpened=false; state.preOpenFails=0;
+    connectWS();
+  }
+  function connectWS(){
+    state.manualClose=false;
+    if(state.reconnectTimer){ clearTimeout(state.reconnectTimer); state.reconnectTimer=null; }
+    var ws;
+    try{ ws=new WebSocket(wsUrl()); }catch(e){ scheduleReconnect(); return; }
+    state.ws=ws;
+    ws.onopen=function(){ state.everOpened=true; state.preOpenFails=0; setWsState(true,"已连接"); };
+    ws.onmessage=function(ev){
+      var m; try{ m=JSON.parse(ev.data); }catch(e){ return; }
+      handle(m);
+    };
+    ws.onclose=function(ev){
+      setWsState(false,"已断开");
+      if(state.running){ chatStatus(false,"连接中断"); state.running=false; refreshSendBtn(); }
+      if(ev.code===4001 || ev.code===1008){ // 服务端明确的认证失败
+        logout(); $("loginErr").textContent="登录已过期，请重新登录"; return;
+      }
+      // 从未握手成功：多半是令牌失效（后端在升级前返回 401）。连续失败即回登录页
+      if(!state.everOpened){
+        state.preOpenFails++;
+        if(state.preOpenFails>=2){ logout(); $("loginErr").textContent="登录已过期，请重新登录"; return; }
+      }
+      if(!state.manualClose) scheduleReconnect();
+    };
+    ws.onerror=function(){ try{ ws.close(); }catch(e){} };
+  }
+  function scheduleReconnect(){
+    if(state.manualClose) return;
+    setWsState(false,"重连中…");
+    state.reconnectTimer=setTimeout(connectWS, 2500);
+  }
+  function send(obj){
+    if(state.ws && state.ws.readyState===1){ state.ws.send(JSON.stringify(obj)); return true; }
+    return false;
+  }
+
+  function handle(m){
+    switch(m.type){
+      case "devices": renderDevices(m.devices||[]); break;
+      case "output":  onOutput(m); break;
+      case "done":    onDone(m); break;
+      case "error":
+      case "device_offline": onError(m); break;
+    }
+  }
+
+  /* ---------------- 设备列表 ---------------- */
+  function renderDevices(list){
+    state.devices=list;
+    var box=$("devList");
+    if(!list.length){
+      box.innerHTML='<div class="empty"><div class="big">🖥️</div>没有在线设备<br>请在电脑上启动 <code>FluxGate Bridge</code><br>登录同一个账号后会自动出现在这里</div>';
+      return;
+    }
+    box.innerHTML="";
+    list.forEach(function(d){
+      var el=document.createElement("button"); el.className="dev"; el.type="button";
+      var initial=(d.device_name||"?").trim().charAt(0).toUpperCase();
+      el.innerHTML=
+        '<div class="dev-ic" style="background:'+colorFor(d.device_id)+'">'+initial+'</div>'+
+        '<div style="flex:1;min-width:0"><div class="dev-name"></div><div class="dev-meta"><span class="dot on"></span>在线 · 点按开始</div></div>'+
+        '<div class="dev-go">›</div>';
+      el.querySelector(".dev-name").textContent=d.device_name||d.device_id;
+      el.onclick=function(){ openChat(d); };
+      box.appendChild(el);
+    });
+  }
+
+  /* ---------------- 聊天 ---------------- */
+  function openChat(d){
+    state.device=d;
+    state.sessionId=uuid();
+    state.running=false; state.curBubble=null;
+    $("chatTitle").textContent=d.device_name||d.device_id;
+    $("msgs").innerHTML="";
+    addSys("已连接到「"+(d.device_name||d.device_id)+"」，发送的指令会在这台电脑上用 Codex 执行");
+    chatStatus(true,"就绪");
+    refreshSendBtn();
+    show("chat");
+    setTimeout(function(){ $("input").focus(); },200);
+  }
+  function chatStatus(on,label){
+    $("chatDot").classList.toggle("on",!!on);
+    $("chatState").textContent=label;
+  }
+  function addBubble(cls,text){
+    var el=document.createElement("div"); el.className="msg "+cls;
+    if(cls==="me") el.style.background="var(--primary)";
+    el.textContent=text||"";
+    $("msgs").appendChild(el); scrollDown(); return el;
+  }
+  function addSys(t){ return addBubble("sys",t); }
+  function scrollDown(){ var m=$("msgs"); m.scrollTop=m.scrollHeight; }
+
+  function sendPrompt(){
+    var val=$("input").value.trim();
+    if(!val) return;
+    if(state.running){ return; }
+    if(!state.device){ return; }
+    if(!(state.ws && state.ws.readyState===1)){ addSys("连接未就绪，正在重连…"); connectWS(); return; }
+    addBubble("me",val);
+    $("input").value=""; autoGrow();
+    var ok=send({type:"prompt",device_id:state.device.device_id,session_id:state.sessionId,prompt:val});
+    if(!ok){ addSys("发送失败，正在重连…"); connectWS(); return; }
+    state.running=true;
+    state.curBubble=addBubble("bot mono","");
+    var cur=document.createElement("span"); cur.className="cursor";
+    state.curBubble.appendChild(cur);
+    chatStatus(true,"执行中…");
+    refreshSendBtn();
+  }
+  function onOutput(m){
+    if(m.session_id!==state.sessionId) return;
+    if(!state.curBubble){ state.curBubble=addBubble("bot mono",""); }
+    var cur=state.curBubble.querySelector(".cursor");
+    if(cur) cur.remove();
+    state.curBubble.appendChild(document.createTextNode(m.data||""));
+    var c=document.createElement("span"); c.className="cursor";
+    state.curBubble.appendChild(c);
+    scrollDown();
+  }
+  function onDone(m){
+    if(m.session_id!==state.sessionId) return;
+    finishBubble();
+    var code=(typeof m.exit_code==="number")?m.exit_code:0;
+    chatStatus(true, code===0?"就绪":("上次退出码 "+code));
+    state.running=false; refreshSendBtn();
+  }
+  function onError(m){
+    // 属于别的会话的错误帧（例如切设备前那次执行的迟到报错）不能打断当前会话，
+    // 否则会把正在跑的气泡收尾、状态改成"错误"。无 session_id 的是全局错误
+    // （如设备离线），照常提示。
+    if(m.session_id && m.session_id!==state.sessionId) return;
+    finishBubble();
+    addSys("⚠ "+(m.message||"发生错误"));
+    chatStatus(false,"错误");
+    state.running=false; refreshSendBtn();
+  }
+  function finishBubble(){
+    if(state.curBubble){
+      var cur=state.curBubble.querySelector(".cursor"); if(cur) cur.remove();
+      if(!state.curBubble.textContent.trim()) state.curBubble.textContent="(无输出)";
+      state.curBubble=null;
+    }
+  }
+  function stopRun(){
+    if(!state.running) return;
+    send({type:"cancel",session_id:state.sessionId});
+    finishBubble(); addSys("已请求停止"); chatStatus(true,"就绪");
+    state.running=false; refreshSendBtn();
+  }
+  function refreshSendBtn(){
+    var b=$("sendBtn");
+    if(state.running){ b.classList.add("stop"); b.classList.remove("grad"); b.innerHTML="■"; b.setAttribute("aria-label","停止"); b.title="停止"; }
+    else { b.classList.remove("stop"); b.classList.add("grad"); b.innerHTML="➤"; b.setAttribute("aria-label","发送"); b.title="发送"; }
+  }
+
+  /* ---------------- 输入框自适应高度 ---------------- */
+  function autoGrow(){
+    var t=$("input"); t.style.height="auto"; t.style.height=Math.min(t.scrollHeight,120)+"px";
+    t.style.overflowY=t.scrollHeight>120?"auto":"hidden";
+  }
+
+  /* ---------------- 事件绑定 ---------------- */
+  $("loginBtn").onclick=doLogin;
+  $("p").addEventListener("keydown",function(e){ if(e.key==="Enter") doLogin(); });
+  $("logoutBtn").onclick=logout;
+  $("refreshBtn").onclick=function(){ send({type:"list_devices"}); var b=$("refreshBtn"); b.style.transform="rotate(360deg)"; b.style.transition="transform .5s"; setTimeout(function(){ b.style.transition=""; b.style.transform=""; },500); };
+  $("backBtn").onclick=function(){ if(state.running) stopRun(); show("devices"); };
+  $("sendBtn").onclick=function(){ if(state.running) stopRun(); else sendPrompt(); };
+  $("input").addEventListener("input",autoGrow);
+  $("input").addEventListener("keydown",function(e){
+    if(e.key==="Enter" && !e.shiftKey && !/Mobi|Android|iPhone/i.test(navigator.userAgent)){
+      e.preventDefault(); sendPrompt();
+    }
+  });
+
+  /* ---------------- 启动 ---------------- */
+  if(state.token){ enterDevices(); } else { show("login"); }
+})();
+</script>
+</body>
+</html>
