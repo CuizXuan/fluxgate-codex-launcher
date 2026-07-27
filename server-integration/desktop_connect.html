@@ -2,45 +2,47 @@
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
 <meta name="theme-color" content="#0E1116">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>FluxGateAI Codex Connect</title>
 <style>
   :root{
-    --bg:#0e1518; --card:#162126; --line:#304047; --text:#f1f5f5; --muted:#9aabb0;
-    --primary:#19b8a6; --accent:#e5a742; --ok:#42c66b; --err:#f0655b; --safe:calc(env(safe-area-inset-bottom) + 10px);
+    --bg:#0E1116; --card:#161B22; --line:#2A313C; --text:#E6EDF3; --muted:#8B949E;
+    --a1:#4F8CFF; --a2:#9B5CFF; --ok:#3FB950; --err:#F85149; --safe:calc(env(safe-area-inset-bottom) + 10px);
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-  html,body{margin:0;height:100%;min-height:100%;background:var(--bg);color:var(--text);
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--text);
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
-    -webkit-font-smoothing:antialiased;overscroll-behavior:none;overflow:hidden}
-  #app{height:100%;height:100dvh;min-height:100%;display:flex;flex-direction:column;width:100%;max-width:560px;margin:0 auto}
+    -webkit-font-smoothing:antialiased;overscroll-behavior:none}
+  #app{height:100%;display:flex;flex-direction:column;max-width:560px;margin:0 auto}
   .hidden{display:none!important}
-  .grad{background:var(--primary)}
+  .grad{background:linear-gradient(135deg,var(--a1),var(--a2))}
   button{font-family:inherit;cursor:pointer;border:none}
   input,textarea{font-family:inherit}
 
   /* ---------- 登录 ---------- */
-  #login{flex:1;display:flex;flex-direction:column;justify-content:center;padding:calc(env(safe-area-inset-top) + 28px) 24px var(--safe);overflow-y:auto}
-  .logo{width:64px;height:64px;border-radius:14px;display:flex;align-items:center;justify-content:center;
-    color:#fff;margin:0 auto 18px;box-shadow:0 8px 28px rgba(25,184,166,.26)}
-  .logo svg{width:42px;height:42px;display:block}
-  .brand{text-align:center;font-size:22px;font-weight:800;letter-spacing:0}
+  #login{flex:1;display:flex;flex-direction:column;justify-content:center;padding:28px 24px}
+  .logo{width:64px;height:64px;border-radius:18px;display:flex;align-items:center;justify-content:center;
+    font-size:34px;font-weight:800;color:#fff;margin:0 auto 18px;box-shadow:0 8px 30px rgba(79,140,255,.35)}
+  .brand{text-align:center;font-size:22px;font-weight:800;letter-spacing:.5px}
   .brand small{display:block;font-size:12px;font-weight:500;color:var(--muted);margin-top:6px;letter-spacing:0}
   .field{margin-top:16px}
   .field label{display:block;font-size:12px;color:var(--muted);margin:0 0 7px 2px}
   .field input{width:100%;padding:14px 14px;border-radius:12px;background:#0D1117;border:1px solid var(--line);
     color:var(--text);font-size:16px;outline:none;transition:border-color .15s}
-  .field input:focus{border-color:var(--primary)}
+  .field input:focus{border-color:var(--a1)}
+  .auth-tabs{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:22px;padding:4px;border-radius:10px;background:#0D1117;border:1px solid var(--line)}
+  .auth-tab{padding:9px;border-radius:7px;background:transparent;color:var(--muted);font-size:13px;font-weight:600}
+  .auth-tab.active{background:var(--card);color:var(--text)}
   .btn{width:100%;padding:15px;border-radius:12px;color:#fff;font-size:16px;font-weight:700;margin-top:22px;
     transition:opacity .15s}
   .btn:active{opacity:.85}
   .btn[disabled]{opacity:.5}
   .err{color:var(--err);font-size:13px;margin-top:14px;text-align:center;min-height:18px;line-height:1.5}
   .sub{margin-top:22px;text-align:center;font-size:13px;color:var(--muted)}
-  .sub a{color:var(--primary);text-decoration:none;font-weight:600}
+  .sub a{color:var(--a1);text-decoration:none;font-weight:600}
   .notice{margin-top:26px;font-size:11px;line-height:1.7;color:#5c6672;text-align:center;padding:0 6px}
 
   /* ---------- 顶栏 ---------- */
@@ -48,7 +50,7 @@
     border-bottom:1px solid var(--line);background:rgba(14,17,22,.85);backdrop-filter:blur(10px);position:sticky;top:0;z-index:5}
   .top .t-title{font-size:16px;font-weight:700;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .top .t-sub{font-size:11px;color:var(--muted);font-weight:400}
-  .iconbtn{width:44px;height:44px;border-radius:8px;background:transparent;color:var(--muted);font-size:20px;
+  .iconbtn{width:34px;height:34px;border-radius:9px;background:transparent;color:var(--muted);font-size:18px;
     display:flex;align-items:center;justify-content:center}
   .iconbtn:active{background:#1F2630}
   .dot{width:8px;height:8px;border-radius:50%;background:var(--muted);display:inline-block;margin-right:6px;vertical-align:middle}
@@ -58,49 +60,36 @@
   #devices{flex:1;display:flex;flex-direction:column}
   .dev-scroll{flex:1;overflow-y:auto;padding:16px}
   .dev-hint{font-size:12px;color:var(--muted);margin:2px 2px 14px}
-  .dev{display:flex;align-items:center;gap:14px;width:100%;padding:16px;border-radius:8px;background:var(--card);
-    border:1px solid var(--line);margin-bottom:12px;color:var(--text);text-align:left;transition:transform .08s}
+  .dev{display:flex;align-items:center;gap:14px;padding:16px;border-radius:14px;background:var(--card);
+    border:1px solid var(--line);margin-bottom:12px;transition:transform .08s}
   .dev:active{transform:scale(.985)}
   .dev-ic{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;color:#fff;flex-shrink:0}
-  .dev-name{font-size:15px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .dev-name{font-size:15px;font-weight:600}
   .dev-meta{font-size:12px;color:var(--muted);margin-top:3px}
   .dev-go{color:var(--muted);font-size:20px}
   .empty{text-align:center;color:var(--muted);padding:60px 30px;font-size:14px;line-height:1.9}
   .empty .big{font-size:40px;margin-bottom:10px;opacity:.5}
-  .empty code{background:#0D1117;border:1px solid var(--line);border-radius:6px;padding:2px 7px;font-size:12px;color:var(--primary)}
+  .empty code{background:#0D1117;border:1px solid var(--line);border-radius:6px;padding:2px 7px;font-size:12px;color:var(--a1)}
 
   /* ---------- 聊天 ---------- */
   #chat{flex:1;display:flex;flex-direction:column;min-height:0}
   .msgs{flex:1;overflow-y:auto;padding:16px 14px 8px;display:flex;flex-direction:column;gap:12px}
-  .msg{max-width:88%;padding:11px 14px;border-radius:8px;font-size:14.5px;line-height:1.55;white-space:pre-wrap;overflow-wrap:anywhere}
+  .msg{max-width:88%;padding:11px 14px;border-radius:15px;font-size:14.5px;line-height:1.55;white-space:pre-wrap;word-break:break-word}
   .msg.me{align-self:flex-end;color:#fff;border-bottom-right-radius:5px}
   .msg.bot{align-self:flex-start;background:var(--card);border:1px solid var(--line);border-bottom-left-radius:5px}
   .msg.bot.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px;color:#c9d3de}
   .msg.sys{align-self:center;background:transparent;color:var(--muted);font-size:12px;padding:4px 10px}
-  .msg .cursor{display:inline-block;width:7px;height:15px;background:var(--primary);vertical-align:text-bottom;
+  .msg .cursor{display:inline-block;width:7px;height:15px;background:var(--a1);vertical-align:text-bottom;
     margin-left:2px;animation:blink 1s steps(2) infinite;border-radius:1px}
   @keyframes blink{0%{opacity:1}50%{opacity:0}}
   .composer{border-top:1px solid var(--line);padding:10px 12px var(--safe);background:var(--bg);display:flex;gap:10px;align-items:flex-end}
-  .composer textarea{flex:1;resize:none;max-height:120px;overflow-y:hidden;padding:12px 14px;border-radius:8px;background:#0D1117;
+  .composer textarea{flex:1;resize:none;max-height:120px;padding:12px 14px;border-radius:14px;background:#0D1117;
     border:1px solid var(--line);color:var(--text);font-size:16px;outline:none;line-height:1.4}
-  .composer textarea:focus{border-color:var(--primary)}
-  .send{width:46px;height:46px;border-radius:8px;color:#fff;font-size:20px;flex-shrink:0;
+  .composer textarea:focus{border-color:var(--a1)}
+  .send{width:46px;height:46px;border-radius:13px;color:#fff;font-size:20px;flex-shrink:0;
     display:flex;align-items:center;justify-content:center}
   .send.stop{background:var(--err)!important}
   .send[disabled]{opacity:.45}
-  .send:focus-visible,.iconbtn:focus-visible,.dev:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-  @media (max-width:360px){
-    #login{padding-left:16px;padding-right:16px}
-    .logo{width:56px;height:56px;margin-bottom:14px}
-    .logo svg{width:36px;height:36px}
-    .brand{font-size:20px}
-    .dev-scroll{padding:12px}
-    .msgs{padding-left:10px;padding-right:10px}
-  }
-  @media (min-width:700px){
-    body{border-inline:1px solid #1d2a2f}
-    #login{padding-left:64px;padding-right:64px}
-  }
 </style>
 </head>
 <body>
@@ -108,15 +97,27 @@
 
   <!-- 登录页 -->
   <section id="login">
-    <div class="logo grad" aria-hidden="true"><svg viewBox="0 0 64 64"><path fill="#0e1518" d="M10 10h44v13H23v34H10z"/><path fill="#fff" d="M29 29h22v10H29z"/><path fill="#fff" d="m45 24 11 10-11 10z"/><circle cx="17" cy="17" r="4" fill="#fff"/></svg></div>
+    <div class="logo grad">⚡</div>
     <div class="brand">FluxGateAI<small>Codex 手机端 · 远程连接你的电脑</small></div>
-    <div class="field">
-      <label for="u">FluxGateAI 账号</label>
-      <input id="u" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="用户名">
+    <div class="auth-tabs">
+      <button id="modeAccount" class="auth-tab active" type="button">账号密码</button>
+      <button id="modeKey" class="auth-tab" type="button">API Key</button>
     </div>
-    <div class="field">
-      <label for="p">密码</label>
-      <input id="p" type="password" autocomplete="current-password" placeholder="密码">
+    <div id="accountFields">
+      <div class="field">
+        <label>FluxGateAI 账号</label>
+        <input id="u" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="用户名">
+      </div>
+      <div class="field">
+        <label>密码</label>
+        <input id="p" type="password" autocomplete="current-password" placeholder="密码">
+      </div>
+    </div>
+    <div id="keyFields" class="hidden">
+      <div class="field">
+        <label>desktop-codex 专用 API Key</label>
+        <input id="k" type="password" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="sk-...">
+      </div>
     </div>
     <button id="loginBtn" class="btn grad">登 录</button>
     <div id="loginErr" class="err"></div>
@@ -131,8 +132,8 @@
         <div class="t-title">选择设备</div>
         <div class="t-sub"><span id="wsDot" class="dot"></span><span id="wsState">连接中…</span></div>
       </div>
-      <button class="iconbtn" id="refreshBtn" title="刷新设备" aria-label="刷新设备">⟳</button>
-      <button class="iconbtn" id="logoutBtn" title="退出登录" aria-label="退出登录">↪</button>
+      <button class="iconbtn" id="refreshBtn" title="刷新">⟳</button>
+      <button class="iconbtn" id="logoutBtn" title="退出">⏻</button>
     </div>
     <div class="dev-scroll">
       <div class="dev-hint">这些是当前在线、已登录你账号的电脑。点按即可开始远程使用 Codex。</div>
@@ -143,7 +144,7 @@
   <!-- 聊天页 -->
   <section id="chat" class="hidden">
     <div class="top">
-      <button class="iconbtn" id="backBtn" title="返回设备列表" aria-label="返回设备列表">‹</button>
+      <button class="iconbtn" id="backBtn">‹</button>
       <div style="flex:1;min-width:0">
         <div class="t-title" id="chatTitle">设备</div>
         <div class="t-sub"><span id="chatDot" class="dot on"></span><span id="chatState">就绪</span></div>
@@ -151,8 +152,8 @@
     </div>
     <div class="msgs" id="msgs"></div>
     <div class="composer">
-      <textarea id="input" rows="1" placeholder="给 Codex 发指令"></textarea>
-      <button class="send grad" id="sendBtn" title="发送" aria-label="发送">➤</button>
+      <textarea id="input" rows="1" placeholder="给 Codex 发指令，例如：修复登录页的报错"></textarea>
+      <button class="send grad" id="sendBtn">➤</button>
     </div>
   </section>
 
@@ -162,11 +163,14 @@
 (function(){
   "use strict";
   var API_LOGIN = "/api/desktop/codex/login";
+  var API_STATUS = "/api/desktop/codex/status";
+  var API_TICKET = "/api/desktop/bridge/ticket";
   var REGISTER_URL = "https://api.fluxapi.cloud";
   var $ = function(id){ return document.getElementById(id); };
 
   var state = {
-    token: null,
+    apiKey: null,
+    loginMode: "account",
     ws: null,
     devices: [],
     device: null,      // {device_id, device_name}
@@ -179,7 +183,10 @@
     preOpenFails: 0
   };
 
-  try { state.token = localStorage.getItem("fluxgate_bridge_token") || null; } catch(e){}
+  try {
+    state.apiKey = localStorage.getItem("fluxgate_bridge_api_key") || null;
+    localStorage.removeItem("fluxgate_bridge_token");
+  } catch(e){}
   $("regLink").href = REGISTER_URL;
 
   function show(id){
@@ -199,20 +206,34 @@
   }
 
   /* ---------------- 登录 ---------------- */
+  function setLoginMode(mode){
+    state.loginMode=mode==="key"?"key":"account";
+    $("modeAccount").classList.toggle("active",state.loginMode==="account");
+    $("modeKey").classList.toggle("active",state.loginMode==="key");
+    $("accountFields").classList.toggle("hidden",state.loginMode!=="account");
+    $("keyFields").classList.toggle("hidden",state.loginMode!=="key");
+    $("loginErr").textContent="";
+  }
   function doLogin(){
+    if(state.loginMode==="key"){
+      var key=$("k").value.trim();
+      if(!key){ $("loginErr").textContent="请输入 API Key"; return; }
+      state.apiKey=key;
+      try{ localStorage.setItem("fluxgate_bridge_api_key",state.apiKey); }catch(e){}
+      enterDevices(); return;
+    }
     var u=$("u").value.trim(), p=$("p").value;
-    if(!u||!p){ $("loginErr").textContent="请输入账号和密码"; return; }
+    if(!u||!p){ $("loginErr").textContent="请输入账号和密码，或切换到 API Key"; return; }
     var btn=$("loginBtn"); btn.disabled=true; btn.textContent="登录中…"; $("loginErr").textContent="";
     fetch(API_LOGIN,{method:"POST",headers:{"Content-Type":"application/json"},
       body:JSON.stringify({username:u,password:p})})
     .then(function(r){ return r.json().catch(function(){ return {success:false,message:"服务器无响应"}; }); })
     .then(function(j){
-      if(!j.success || !j.data || !j.data.access_token){
+      if(!j.success || !j.data || !j.data.api_key){
         throw new Error(j.message || "登录失败");
       }
-      state.token = j.data.access_token;
-      $("p").value="";
-      try{ localStorage.setItem("fluxgate_bridge_token", state.token); }catch(e){}
+      state.apiKey = j.data.api_key;
+      try{ localStorage.setItem("fluxgate_bridge_api_key", state.apiKey); }catch(e){}
       enterDevices();
     })
     .catch(function(e){ $("loginErr").textContent = e.message || "登录失败"; })
@@ -222,16 +243,34 @@
   function logout(){
     state.manualClose=true;
     if(state.ws){ try{ state.ws.close(); }catch(e){} }
-    state.token=null;
-    $("u").value=""; $("p").value="";
-    try{ localStorage.removeItem("fluxgate_bridge_token"); }catch(e){}
+    state.apiKey=null;
+    try{
+      localStorage.removeItem("fluxgate_bridge_api_key");
+      localStorage.removeItem("fluxgate_bridge_token");
+    }catch(e){}
     show("login");
   }
 
   /* ---------------- WebSocket ---------------- */
   function wsUrl(){
     var proto = location.protocol === "https:" ? "wss:" : "ws:";
-    return proto+"//"+location.host+"/api/desktop/bridge/phone?token="+encodeURIComponent(state.token);
+    return proto+"//"+location.host+"/api/desktop/bridge/phone";
+  }
+  function requestTicket(){
+    return fetch(API_TICKET,{method:"POST",headers:{"Authorization":"Bearer "+state.apiKey}})
+      .then(function(r){
+        return r.json().catch(function(){ return {success:false,message:"服务器无响应"}; })
+          .then(function(j){ return {status:r.status,body:j}; });
+      })
+      .then(function(result){
+        var j=result.body;
+        if(!j.success || !j.data || !j.data.ticket){
+          var err=new Error(j.message || (j.error&&j.error.message) || "无法获取 Bridge 票据");
+          err.auth=result.status===401 || result.status===403;
+          throw err;
+        }
+        return j.data.ticket;
+      });
   }
   function setWsState(on,label){
     $("wsDot").classList.toggle("on",!!on);
@@ -246,28 +285,35 @@
   function connectWS(){
     state.manualClose=false;
     if(state.reconnectTimer){ clearTimeout(state.reconnectTimer); state.reconnectTimer=null; }
-    var ws;
-    try{ ws=new WebSocket(wsUrl()); }catch(e){ scheduleReconnect(); return; }
-    state.ws=ws;
-    ws.onopen=function(){ state.everOpened=true; state.preOpenFails=0; setWsState(true,"已连接"); };
-    ws.onmessage=function(ev){
-      var m; try{ m=JSON.parse(ev.data); }catch(e){ return; }
-      handle(m);
-    };
-    ws.onclose=function(ev){
-      setWsState(false,"已断开");
-      if(state.running){ chatStatus(false,"连接中断"); state.running=false; refreshSendBtn(); }
-      if(ev.code===4001 || ev.code===1008){ // 服务端明确的认证失败
-        logout(); $("loginErr").textContent="登录已过期，请重新登录"; return;
-      }
-      // 从未握手成功：多半是令牌失效（后端在升级前返回 401）。连续失败即回登录页
-      if(!state.everOpened){
-        state.preOpenFails++;
-        if(state.preOpenFails>=2){ logout(); $("loginErr").textContent="登录已过期，请重新登录"; return; }
-      }
+    requestTicket().then(function(ticket){
+      if(state.manualClose) return;
+      var ws;
+      try{ ws=new WebSocket(wsUrl(),["fluxgate-bridge","ticket."+ticket]); }
+      catch(e){ scheduleReconnect(); return; }
+      state.ws=ws;
+      ws.onopen=function(){ state.everOpened=true; state.preOpenFails=0; setWsState(true,"已连接"); };
+      ws.onmessage=function(ev){
+        var m; try{ m=JSON.parse(ev.data); }catch(e){ return; }
+        handle(m);
+      };
+      ws.onclose=function(ev){
+        setWsState(false,"已断开");
+        if(state.running){ chatStatus(false,"连接中断"); state.running=false; refreshSendBtn(); }
+        if(ev.code===4001 || ev.code===1008){
+          logout(); $("loginErr").textContent="登录已过期，请重新登录"; return;
+        }
+        if(!state.everOpened){
+          state.preOpenFails++;
+          if(state.preOpenFails>=2){ logout(); $("loginErr").textContent="登录已过期，请重新登录"; return; }
+        }
+        if(!state.manualClose) scheduleReconnect();
+      };
+      ws.onerror=function(){ try{ ws.close(); }catch(e){} };
+    }).catch(function(e){
+      setWsState(false,"认证失败");
+      if(e.auth){ logout(); $("loginErr").textContent=e.message||"登录已过期，请重新登录"; return; }
       if(!state.manualClose) scheduleReconnect();
-    };
-    ws.onerror=function(){ try{ ws.close(); }catch(e){} };
+    });
   }
   function scheduleReconnect(){
     if(state.manualClose) return;
@@ -299,7 +345,7 @@
     }
     box.innerHTML="";
     list.forEach(function(d){
-      var el=document.createElement("button"); el.className="dev"; el.type="button";
+      var el=document.createElement("div"); el.className="dev";
       var initial=(d.device_name||"?").trim().charAt(0).toUpperCase();
       el.innerHTML=
         '<div class="dev-ic" style="background:'+colorFor(d.device_id)+'">'+initial+'</div>'+
@@ -330,7 +376,7 @@
   }
   function addBubble(cls,text){
     var el=document.createElement("div"); el.className="msg "+cls;
-    if(cls==="me") el.style.background="var(--primary)";
+    if(cls==="me") el.style.background="linear-gradient(135deg,var(--a1),var(--a2))";
     el.textContent=text||"";
     $("msgs").appendChild(el); scrollDown(); return el;
   }
@@ -396,19 +442,21 @@
   }
   function refreshSendBtn(){
     var b=$("sendBtn");
-    if(state.running){ b.classList.add("stop"); b.classList.remove("grad"); b.innerHTML="■"; b.setAttribute("aria-label","停止"); b.title="停止"; }
-    else { b.classList.remove("stop"); b.classList.add("grad"); b.innerHTML="➤"; b.setAttribute("aria-label","发送"); b.title="发送"; }
+    if(state.running){ b.classList.add("stop"); b.classList.remove("grad"); b.innerHTML="■"; }
+    else { b.classList.remove("stop"); b.classList.add("grad"); b.innerHTML="➤"; }
   }
 
   /* ---------------- 输入框自适应高度 ---------------- */
   function autoGrow(){
     var t=$("input"); t.style.height="auto"; t.style.height=Math.min(t.scrollHeight,120)+"px";
-    t.style.overflowY=t.scrollHeight>120?"auto":"hidden";
   }
 
   /* ---------------- 事件绑定 ---------------- */
   $("loginBtn").onclick=doLogin;
+  $("modeAccount").onclick=function(){ setLoginMode("account"); };
+  $("modeKey").onclick=function(){ setLoginMode("key"); };
   $("p").addEventListener("keydown",function(e){ if(e.key==="Enter") doLogin(); });
+  $("k").addEventListener("keydown",function(e){ if(e.key==="Enter") doLogin(); });
   $("logoutBtn").onclick=logout;
   $("refreshBtn").onclick=function(){ send({type:"list_devices"}); var b=$("refreshBtn"); b.style.transform="rotate(360deg)"; b.style.transition="transform .5s"; setTimeout(function(){ b.style.transition=""; b.style.transform=""; },500); };
   $("backBtn").onclick=function(){ if(state.running) stopRun(); show("devices"); };
@@ -421,7 +469,14 @@
   });
 
   /* ---------------- 启动 ---------------- */
-  if(state.token){ enterDevices(); } else { show("login"); }
+  if(state.apiKey){
+    enterDevices();
+  } else {
+    show("login");
+    fetch(API_STATUS).then(function(r){ return r.json(); }).then(function(j){
+      if(j.success && j.data && j.data.password_login_enabled===false) setLoginMode("key");
+    }).catch(function(){});
+  }
 })();
 </script>
 </body>

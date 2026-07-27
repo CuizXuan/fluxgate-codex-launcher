@@ -29,7 +29,7 @@ No release asset contains Codex Desktop, Codex CLI, `app.asar`, or any other Ope
 Requirements: Windows PowerShell 5.1, the inbox .NET Framework C# compiler, and Node.js.
 
 ```powershell
-.\build\build-release.ps1 -Version 2.0.0
+.\build\build-release.ps1 -Version 2.0.1
 ```
 
 The build validates PowerShell and Bridge syntax, compiles the EXE, runs its embedded-resource self-test, and creates Bridge/mobile ZIP assets. The EXE is a transparent launcher for the included GUI PowerShell script; it is not an archive of Codex itself.

@@ -4,11 +4,11 @@ import (
 	_ "embed"
 	"net/http"
 	"net/url"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
-	"github.com/QuantumNous/new-api/model"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
@@ -17,11 +17,11 @@ import (
 // Desktop Bridge: a phone <-> desktop relay for driving Codex remotely.
 //
 //   Phone browser (/api/desktop/connect)
-//        |  WS /api/desktop/bridge/phone?token=<access_token>
+//        |  WS /api/desktop/bridge/phone (one-use WebSocket ticket)
 //        v
 //   Bridge hub (this file, in-memory, isolated per user)
 //        ^
-//        |  WS /api/desktop/bridge/device?token=<access_token>&device_id=..&device_name=..
+//        |  WS /api/desktop/bridge/device (Authorization: Bearer sk-...)
 //   Desktop bridge client -> runs `codex exec` in the isolated CODEX_HOME
 //
 // The hub only relays JSON frames. It never stores Codex/OpenAI credentials,
@@ -32,13 +32,89 @@ const (
 	bridgePongWait       = 60 * time.Second
 	bridgePingPeriod     = 50 * time.Second
 	bridgeMaxMessageSize = 4 << 20 // 4 MiB per frame; the device client chunks large output
+	bridgeMaxPromptSize  = 1 << 20
+	bridgeMaxIdentifier  = 128
 	bridgeSendBuffer     = 128
+	bridgeTicketLifetime = 60 * time.Second
+	bridgeSubprotocol    = "fluxgate-bridge"
 )
 
 var bridgeUpgrader = websocket.Upgrader{
-	CheckOrigin:     func(r *http.Request) bool { return true },
+	CheckOrigin:     bridgeCheckOrigin,
 	ReadBufferSize:  4096,
 	WriteBufferSize: 4096,
+	Subprotocols:    []string{bridgeSubprotocol},
+}
+
+type bridgeTicket struct {
+	userID    int
+	expiresAt time.Time
+}
+
+var bridgeTickets = struct {
+	sync.Mutex
+	items map[string]bridgeTicket
+}{items: make(map[string]bridgeTicket)}
+
+func bridgeCheckOrigin(r *http.Request) bool {
+	origin := strings.TrimSpace(r.Header.Get("Origin"))
+	if origin == "" {
+		return true // Native desktop clients do not send Origin.
+	}
+	parsed, err := url.Parse(origin)
+	if err != nil || !strings.EqualFold(parsed.Host, r.Host) {
+		return false
+	}
+	requestScheme := strings.ToLower(strings.TrimSpace(r.URL.Scheme))
+	if requestScheme == "" {
+		requestScheme = "http"
+		forwardedProto := strings.TrimSpace(strings.Split(r.Header.Get("X-Forwarded-Proto"), ",")[0])
+		if r.TLS != nil || strings.EqualFold(forwardedProto, "https") {
+			requestScheme = "https"
+		}
+	}
+	return strings.EqualFold(parsed.Scheme, requestScheme)
+}
+
+func issueBridgeTicket(userID int) (string, error) {
+	value, err := common.GenerateKey()
+	if err != nil {
+		return "", err
+	}
+	now := time.Now()
+	bridgeTickets.Lock()
+	for key, ticket := range bridgeTickets.items {
+		if !ticket.expiresAt.After(now) {
+			delete(bridgeTickets.items, key)
+		}
+	}
+	bridgeTickets.items[value] = bridgeTicket{userID: userID, expiresAt: now.Add(bridgeTicketLifetime)}
+	bridgeTickets.Unlock()
+	return value, nil
+}
+
+func consumeBridgeTicket(value string) (int, bool) {
+	if value == "" {
+		return 0, false
+	}
+	bridgeTickets.Lock()
+	ticket, ok := bridgeTickets.items[value]
+	delete(bridgeTickets.items, value)
+	bridgeTickets.Unlock()
+	if !ok || !ticket.expiresAt.After(time.Now()) {
+		return 0, false
+	}
+	return ticket.userID, true
+}
+
+func bridgeTicketFromRequest(r *http.Request) string {
+	for _, protocol := range strings.Split(r.Header.Get("Sec-WebSocket-Protocol"), ",") {
+		protocol = strings.TrimSpace(protocol)
+		if strings.HasPrefix(protocol, "ticket.") {
+			return strings.TrimPrefix(protocol, "ticket.")
+		}
+	}
+	return ""
 }
 
 // bridgeMessage is the on-wire envelope for every frame in both directions.
@@ -221,7 +297,9 @@ func (h *bridgeHub) unregisterPhone(conn *bridgeConn) {
 // routePrompt forwards a phone prompt to the target device, creating the
 // session on first use. Returns false if the device is not reachable.
 func (h *bridgeHub) routePrompt(phone *bridgeConn, msg bridgeMessage) bool {
-	if msg.DeviceID == "" || msg.SessionID == "" {
+	if msg.DeviceID == "" || len(msg.DeviceID) > bridgeMaxIdentifier ||
+		msg.SessionID == "" || len(msg.SessionID) > bridgeMaxIdentifier ||
+		len(msg.Prompt) > bridgeMaxPromptSize {
 		return false
 	}
 	key := bridgeSessionKey{userID: phone.userID, sessionID: msg.SessionID}
@@ -310,24 +388,6 @@ func (c *bridgeConn) writePump() {
 	}
 }
 
-func bridgeAuthUser(c *gin.Context) *model.User {
-	token := c.Query("token")
-	if token == "" {
-		token = c.GetHeader("Authorization")
-	}
-	if token == "" {
-		return nil
-	}
-	user, err := model.ValidateAccessToken(token)
-	if err != nil || user == nil {
-		return nil
-	}
-	if user.Status != common.UserStatusEnabled {
-		return nil
-	}
-	return user
-}
-
 func bridgePrepareConn(ws *websocket.Conn) {
 	ws.SetReadLimit(bridgeMaxMessageSize)
 	_ = ws.SetReadDeadline(time.Now().Add(bridgePongWait))
@@ -336,21 +396,60 @@ func bridgePrepareConn(ws *websocket.Conn) {
 	})
 }
 
+func requireDesktopBridgeToken(c *gin.Context) bool {
+	if c.GetString("token_name") == desktopCodexTokenName {
+		return true
+	}
+	c.JSON(http.StatusForbidden, gin.H{
+		"success": false,
+		"message": "Bridge 仅接受名为 desktop-codex 的专用 API Key",
+	})
+	return false
+}
+
+// DesktopBridgeTicket mints a one-use ticket for the browser WebSocket. The
+// caller authenticates with a revocable API key in the Authorization header;
+// the full key never appears in a URL or proxy access log.
+func DesktopBridgeTicket(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
+	if !requireDesktopBridgeToken(c) {
+		return
+	}
+	userID := c.GetInt("id")
+	if userID <= 0 {
+		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "message": "API Key 无效"})
+		return
+	}
+	ticket, err := issueBridgeTicket(userID)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	common.ApiSuccess(c, gin.H{"ticket": ticket, "expires_in": int(bridgeTicketLifetime.Seconds())})
+}
+
 // DesktopBridgeDevice handles the desktop client websocket.
 func DesktopBridgeDevice(c *gin.Context) {
-	user := bridgeAuthUser(c)
-	if user == nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "message": "访问令牌无效"})
+	if !requireDesktopBridgeToken(c) {
+		return
+	}
+	userID := c.GetInt("id")
+	if userID <= 0 {
+		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "message": "API Key 无效"})
 		return
 	}
 	deviceID := c.Query("device_id")
-	if deviceID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "缺少 device_id"})
+	if deviceID == "" || len(deviceID) > bridgeMaxIdentifier {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "device_id 无效"})
 		return
 	}
-	deviceName, _ := url.QueryUnescape(c.Query("device_name"))
+	deviceName := c.Query("device_name")
 	if deviceName == "" {
 		deviceName = deviceID
+	}
+	if len(deviceName) > bridgeMaxIdentifier {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "device_name 过长"})
+		return
 	}
 	ws, err := bridgeUpgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
@@ -358,7 +457,7 @@ func DesktopBridgeDevice(c *gin.Context) {
 	}
 	conn := &bridgeConn{
 		ws: ws, send: make(chan []byte, bridgeSendBuffer),
-		userID: user.Id, role: "device", deviceID: deviceID, deviceName: deviceName,
+		userID: userID, role: "device", deviceID: deviceID, deviceName: deviceName,
 		closed: make(chan struct{}),
 	}
 	bridgePrepareConn(ws)
@@ -390,9 +489,9 @@ func DesktopBridgeDevice(c *gin.Context) {
 
 // DesktopBridgePhone handles the mobile client websocket.
 func DesktopBridgePhone(c *gin.Context) {
-	user := bridgeAuthUser(c)
-	if user == nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "message": "访问令牌无效"})
+	userID, ok := consumeBridgeTicket(bridgeTicketFromRequest(c.Request))
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "message": "Bridge 票据无效或已过期"})
 		return
 	}
 	ws, err := bridgeUpgrader.Upgrade(c.Writer, c.Request, nil)
@@ -401,13 +500,13 @@ func DesktopBridgePhone(c *gin.Context) {
 	}
 	conn := &bridgeConn{
 		ws: ws, send: make(chan []byte, bridgeSendBuffer),
-		userID: user.Id, role: "phone",
+		userID: userID, role: "phone",
 		closed: make(chan struct{}),
 	}
 	bridgePrepareConn(ws)
 	hub.registerPhone(conn)
 	go conn.writePump()
-	conn.trySend(bridgeMessage{Type: "devices", Devices: hub.listDevices(user.Id)})
+	conn.trySend(bridgeMessage{Type: "devices", Devices: hub.listDevices(userID)})
 	defer conn.close()
 	defer hub.unregisterPhone(conn)
 
@@ -422,7 +521,7 @@ func DesktopBridgePhone(c *gin.Context) {
 		}
 		switch msg.Type {
 		case "list_devices":
-			conn.trySend(bridgeMessage{Type: "devices", Devices: hub.listDevices(user.Id)})
+			conn.trySend(bridgeMessage{Type: "devices", Devices: hub.listDevices(userID)})
 		case "prompt":
 			if !hub.routePrompt(conn, msg) {
 				conn.trySend(bridgeMessage{Type: "error", SessionID: msg.SessionID, DeviceID: msg.DeviceID, Message: "目标设备不在线"})
@@ -440,5 +539,9 @@ var desktopConnectHTML []byte
 
 // DesktopConnectPage serves the self-contained mobile bridge page.
 func DesktopConnectPage(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
+	c.Header("Content-Security-Policy", "default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self' ws: wss:; img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'")
+	c.Header("Referrer-Policy", "no-referrer")
+	c.Header("X-Content-Type-Options", "nosniff")
 	c.Data(http.StatusOK, "text/html; charset=utf-8", desktopConnectHTML)
 }

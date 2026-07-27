@@ -1,5 +1,5 @@
 ﻿# ============================================================================
-#  FluxGateAI · Codex 一键安装器 (Windows / 图形界面版)  v2.0.0
+#  FluxGateAI · Codex 一键安装器 (Windows / 图形界面版)  v2.0.1
 # ----------------------------------------------------------------------------
 #  隔离 Launcher 架构：
 #    %APPDATA%\FluxGateAICodexLauncher\
@@ -20,10 +20,10 @@ $BrandName      = 'FluxGateAI'
 $ProviderId     = 'fluxgate'
 $GatewayBaseUrl = 'https://api.fluxapi.cloud/v1'
 $SiteBaseUrl    = 'https://api.fluxapi.cloud'         # 控制台 / desktop API 根地址
-$DefaultModel   = 'gpt-5-codex'
+$DefaultModel   = 'gpt-5.4-mini'
 $GitHubProxy    = ''                                  # 大陆加速可填 'https://gh-proxy.com/'
 $NpmMirror      = 'https://registry.npmmirror.com'
-$AppVersion     = 'v2.0.0'
+$AppVersion     = 'v2.0.1'
 $LauncherDirName = 'FluxGateAICodexLauncher'          # %APPDATA% 下的专属目录名
 # ==========================================================================
 
@@ -327,7 +327,7 @@ $workerScript = {
     function Log([string]$t)  { $sync.Log.Enqueue(('[' + (Get-Date -Format 'HH:mm:ss') + '] ' + $t)) }
     function Stage([string]$s, [int]$p) { $sync.Stage = $s; $sync.Progress = $p; Log ('== ' + $s) }
 
-    # ---- 通用：账号登录换 Key（阶段0 后端端点） ----
+    # ---- 通用：账号登录直接获取专用 Key ----
     function Resolve-ApiKey {
         if ($cfg.AuthMode -eq 'key') {
             if ([string]::IsNullOrWhiteSpace($cfg.ApiKey)) { throw '未提供 API Key' }
@@ -344,16 +344,13 @@ $workerScript = {
             throw ('登录请求失败: ' + $_.Exception.Message)
         }
         if (-not $loginResp.success) { throw ('登录失败: ' + $loginResp.message) }
-        $accessToken = [string]$loginResp.data.access_token
-        if ([string]::IsNullOrWhiteSpace($accessToken)) { throw '登录响应缺少 access_token' }
+        $key = [string]$loginResp.data.api_key
+        if ([string]::IsNullOrWhiteSpace($key)) { throw '登录响应缺少专用 API Key' }
         $u = $loginResp.data.user
         if ($u) { Log ('登录成功: ' + $u.username + '（额度 ' + $u.quota + '）') }
-        $tokenResp = Invoke-RestMethod -Uri ($api + '/api/desktop/codex/token') -Headers @{ Authorization = ('Bearer ' + $accessToken) } -TimeoutSec 30
-        if (-not $tokenResp.success) { throw ('获取 API Key 失败: ' + $tokenResp.message) }
-        $key = [string]$tokenResp.data.api_key
-        if ([string]::IsNullOrWhiteSpace($key)) { throw '服务端未返回 api_key' }
+        # 生产登录接口已经返回专用 Key。网关地址仍以安装器的 API 子域为准，
+        # 避免站点 ServerAddress 把 Codex 配置指向控制台根域。
         $base = $cfg.GatewayBaseUrl
-        if ($tokenResp.data.connection -and $tokenResp.data.connection.base_url) { $base = [string]$tokenResp.data.connection.base_url }
         Log ('已获取专用 API Key（desktop-codex）')
         return @{ ApiKey = $key; BaseUrl = $base }
     }

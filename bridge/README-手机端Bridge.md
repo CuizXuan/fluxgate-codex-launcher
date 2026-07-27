@@ -6,12 +6,12 @@
 
 ```
  手机浏览器  https://api.fluxapi.cloud/api/desktop/connect
-     │  账号密码登录（复用阶段0 的 /api/desktop/codex/login → access_token）
-     │  WSS  /api/desktop/bridge/phone?token=<access_token>
+     │  账号密码登录或专用 API Key → POST /api/desktop/bridge/ticket
+     │  WSS  /api/desktop/bridge/phone（一次性 ticket 子协议）
      ▼
  FluxGate 网关内的 Bridge Hub（内存中转，按 user_id 严格隔离）
      ▲
-     │  WSS  /api/desktop/bridge/device?token=<access_token>&device_id=..&device_name=..
+     │  WSS  /api/desktop/bridge/device（Authorization: Bearer <desktop-codex API Key>）
  桌面 Bridge 客户端（fluxgate-bridge.mjs）
      │  收到 prompt → 用隔离 CODEX_HOME 跑  codex exec  → 流式回传 stdout
      ▼
@@ -28,6 +28,7 @@ Hub 只转发 JSON 帧，不落任何 Codex/OpenAI 凭证；一个手机账号�
 - `controller/desktop_connect.html` — 自包含移动端页面（被上面的 go:embed 内嵌）
 - `router/api-router.go` — 新增路由：
   - `GET /api/desktop/bridge/device`、`/phone`（挂在引擎根，**绕开 gzip**，否则 WS 升级会被 gzip 包装的 ResponseWriter 破坏）
+  - `POST /api/desktop/bridge/ticket`（专用 API Key 换取 60 秒、单次使用的手机 WSS 票据）
   - `GET /api/desktop/connect`（手机页面，走 gzip 无妨）
 
 WS 帧协议（JSON）：
@@ -37,7 +38,7 @@ Hub→手机： {type:"devices", devices:[{device_id,device_name,online}]} | {ty
 设备→Hub： {type:"output",session_id,data} | {type:"done",session_id,exit_code} | {type:"error",...}
 Hub→设备： {type:"exec",session_id,prompt,cwd} | {type:"cancel",session_id}
 ```
-鉴权：WS 用 `?token=<access_token>` 查询参数（浏览器 WS 不便带 Authorization 头），后端 `ValidateAccessToken` 校验 + 账号启用状态。含 50s 心跳 ping、断连自动清理会话与设备并广播。
+鉴权：桌面端 WSS 使用 `Authorization: Bearer <desktop-codex API Key>`；手机页先用同一专用 Key 换取一次性 ticket，再通过 `Sec-WebSocket-Protocol: fluxgate-bridge, ticket.<ticket>` 建连。完整 API Key 不进入 URL 或代理访问日志。含 50s 心跳 ping、断连自动清理会话与设备并广播。
 
 **2. 桌面 Bridge 客户端（Node）**
 
@@ -45,7 +46,7 @@ Hub→设备： {type:"exec",session_id,prompt,cwd} | {type:"cancel",session_id}
 - `package.json` — 依赖 `ws`
 - `启动 FluxGate Bridge.bat` — 检测 Node → 首次自动 `npm install`（失败切 npmmirror 镜像）→ 运行
 
-首次运行引导登录 FluxGate 账号换 access_token，保存到 `fluxgate-bridge.config.json`；device_id 自动生成并持久化，device_name 取主机名。执行用隔离 `CODEX_HOME`（默认指向阶段2 的 `%APPDATA%\FluxGateAICodexLauncher\codex-home`），**不碰官方 Codex**。
+首次运行引导登录 FluxGate 账号换取名为 `desktop-codex` 的专用 API Key，保存到 `fluxgate-bridge.config.json`；旧版 access token 配置会被拒绝并要求重新登录。device_id 自动生成并持久化，device_name 取主机名。执行用隔离 `CODEX_HOME`（默认指向阶段2 的 `%APPDATA%\FluxGateAICodexLauncher\codex-home`），**不碰官方 Codex**。
 
 **3. 手机页面**：深色移动端，登录→设备列表→聊天，流式显示 Codex 输出，支持停止、断线自动重连、令牌失效自动回登录页、localStorage 记住登录。
 

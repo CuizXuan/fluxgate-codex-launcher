@@ -1,5 +1,5 @@
 param(
-    [string]$Version = '2.0.0',
+    [string]$Version = '2.0.1',
     [string]$OutputDir = ''
 )
 
@@ -31,6 +31,10 @@ if ($LASTEXITCODE -ne 0) {
 & node --check (Join-Path $root 'bridge\mobile-mock-server.mjs')
 if ($LASTEXITCODE -ne 0) {
     throw 'Mobile preview server syntax validation failed'
+}
+& node --test (Join-Path $root 'tests\production-contract.test.mjs')
+if ($LASTEXITCODE -ne 0) {
+    throw 'Production contract validation failed'
 }
 
 $mobilePage = Join-Path $root 'mobile-web\index.html'

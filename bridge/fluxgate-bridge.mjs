@@ -67,7 +67,14 @@ function ask(q, opts = {}) {
 
 function loadConfig() {
   if (fs.existsSync(CONFIG_PATH)) {
-    try { return { ...DEFAULTS, ...JSON.parse(fs.readFileSync(CONFIG_PATH, "utf8")) }; }
+    try {
+      const saved = JSON.parse(fs.readFileSync(CONFIG_PATH, "utf8"));
+      if (saved.accessToken && !saved.apiKey) {
+        log("检测到旧版 Bridge 凭据，请重新登录以获取专用 API Key");
+        return null;
+      }
+      return { ...DEFAULTS, ...saved };
+    }
     catch (e) { log("配置文件损坏，重新初始化:", e.message); }
   }
   return null;
@@ -84,9 +91,8 @@ async function firstRunSetup() {
   if (site) cfg.siteBaseUrl = site.replace(/\/+$/, "");
   const username = await ask("FluxGateAI 账号: ");
   const password = await ask("密码: ", { hidden: true });
-  log("正在登录换取访问令牌...");
-  const token = await login(cfg.siteBaseUrl, username, password);
-  cfg.accessToken = token;
+  log("正在登录获取专用 API Key...");
+  cfg.apiKey = await login(cfg.siteBaseUrl, username, password);
   const wd = await ask("Codex 工作目录 [" + cfg.workdir + "]: ");
   if (wd) cfg.workdir = wd;
   cfg.deviceId = crypto.randomUUID();
@@ -102,11 +108,11 @@ async function login(siteBaseUrl, username, password) {
     body: JSON.stringify({ username, password })
   });
   const j = await r.json().catch(() => ({}));
-  if (!j.success || !j.data || !j.data.access_token) {
+  if (!j.success || !j.data || !j.data.api_key) {
     throw new Error("登录失败: " + (j.message || ("HTTP " + r.status)));
   }
   log("登录成功:", j.data.user && j.data.user.username);
-  return j.data.access_token;
+  return j.data.api_key;
 }
 
 // Windows 下 npm 安装的 codex 是 codex.cmd 垫片，Node 的 spawn 不带 shell 时无法
@@ -155,12 +161,14 @@ class Bridge {
     const u = new URL(this.cfg.siteBaseUrl);
     const proto = u.protocol === "https:" ? "wss:" : "ws:";
     const name = encodeURIComponent(this.cfg.deviceName || os.hostname());
-    return `${proto}//${u.host}/api/desktop/bridge/device?token=${encodeURIComponent(this.cfg.accessToken)}&device_id=${encodeURIComponent(this.cfg.deviceId)}&device_name=${name}`;
+    return `${proto}//${u.host}/api/desktop/bridge/device?device_id=${encodeURIComponent(this.cfg.deviceId)}&device_name=${name}`;
   }
 
   connect() {
     log("连接网关 Bridge...");
-    const ws = new WebSocket(this.wsUrl());
+    const ws = new WebSocket(this.wsUrl(), {
+      headers: { Authorization: `Bearer ${this.cfg.apiKey}` }
+    });
     this.ws = ws;
     ws.on("open", () => {
       this.backoff = 1000;
@@ -282,7 +290,7 @@ function killTree(child) {
 // ---------------------------------------------------------------------------
 (async function main() {
   let cfg = loadConfig();
-  if (!cfg || !cfg.accessToken || !cfg.deviceId) {
+  if (!cfg || !cfg.apiKey || !cfg.deviceId) {
     cfg = await firstRunSetup();
   }
   if (!fs.existsSync(cfg.codexHome)) {
