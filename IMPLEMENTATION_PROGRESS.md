@@ -20,9 +20,17 @@
 - Not Done: Commit, push, tag, GitHub Release workflow, and final published-asset verification.
 - Next: Finish the companion Switch and APK patch releases, then publish and verify all three repositories together.
 
+## Latest Update - 2026-07-28 01:39
+- Scope: Publish and verify v2.0.1.
+- Completed: Pushed commit `a98231a`, tagged `v2.0.1`, and published the GitHub Release through the Windows workflow.
+- Validation: The release workflow passed; all seven assets downloaded successfully; the published EXE self-test passed; Bridge/mobile ZIPs contain no Codex executable or `app.asar`; final production login, model-list, Chat, Responses, and Bridge-ticket smoke checks passed.
+- Problems / Blockers: None.
+- Not Done: None for v2.0.1.
+- Next: Monitor normal user feedback and keep future desktop/mobile protocol changes covered by the production contract test.
+
 ## Open Issues
 - [x] GUI account login consumes `data.api_key` directly.
 - [x] Desktop Bridge authenticates WSS with the dedicated API key header.
 - [x] Mobile web mints and consumes one-use Bridge tickets.
 - [x] Local release assets build successfully.
-- [ ] Publish and verify the v2.0.1 GitHub Release assets.
+- [x] Publish and verify the v2.0.1 GitHub Release assets.
