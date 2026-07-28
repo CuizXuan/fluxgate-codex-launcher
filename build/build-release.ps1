@@ -1,5 +1,5 @@
 param(
-    [string]$Version = '2.0.1',
+    [string]$Version = '2.1.0',
     [string]$OutputDir = ''
 )
 
@@ -70,17 +70,47 @@ if (-not $csc) {
 $exeName = "FluxGate-Codex-Launcher_$Version.exe"
 $exePath = Join-Path $OutputDir $exeName
 $source = Join-Path $root 'src\LauncherBootstrapper.cs'
+$companionSource = Join-Path $root 'src\Companion.cs'
 $guiScript = Join-Path $root 'installer\FluxGate-Codex-Setup-GUI.ps1'
 $icon = Join-Path $root 'assets\fluxgate-launcher.ico'
+$companionExe = Join-Path ([IO.Path]::GetTempPath()) ('FluxGate-Codex-Companion-' + [guid]::NewGuid().ToString('N') + '.exe')
 
-& $csc /nologo /target:winexe /platform:anycpu /optimize+ "/win32icon:$icon" "/resource:$guiScript,FluxGate.CodexLauncher.SetupScript" "/out:$exePath" $source
-if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $exePath)) {
-    throw 'Launcher EXE build failed'
-}
+try {
+    & $csc /nologo /target:winexe /platform:anycpu /optimize+ "/win32icon:$icon" `
+        /r:System.Windows.Forms.dll /r:System.Drawing.dll /r:System.Web.Extensions.dll /r:Microsoft.CSharp.dll `
+        "/out:$companionExe" $companionSource
+    if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $companionExe)) {
+        throw 'Companion EXE build failed'
+    }
+    & $companionExe --self-test
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Companion EXE self-test failed'
+    }
+    $oldCompanionExe = $env:FLUXGATE_COMPANION_EXE
+    try {
+        $env:FLUXGATE_COMPANION_EXE = $companionExe
+        & node --test (Join-Path $root 'tests\companion.integration.test.mjs')
+        if ($LASTEXITCODE -ne 0) {
+            throw 'Companion integration test failed'
+        }
+    } finally {
+        $env:FLUXGATE_COMPANION_EXE = $oldCompanionExe
+    }
 
-& $exePath --self-test
-if ($LASTEXITCODE -ne 0) {
-    throw 'Launcher EXE embedded-resource self-test failed'
+    & $csc /nologo /target:winexe /platform:anycpu /optimize+ "/win32icon:$icon" `
+        "/resource:$guiScript,FluxGate.CodexLauncher.SetupScript" `
+        "/resource:$companionExe,FluxGate.CodexLauncher.Companion" `
+        "/out:$exePath" $source
+    if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $exePath)) {
+        throw 'Launcher EXE build failed'
+    }
+
+    & $exePath --self-test
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Launcher EXE embedded-resource self-test failed'
+    }
+} finally {
+    Remove-Item -LiteralPath $companionExe -Force -ErrorAction SilentlyContinue
 }
 
 $deliverables = @{

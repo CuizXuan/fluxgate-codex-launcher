@@ -41,4 +41,4 @@ jobs:
         run: |
           gh release create "${{ github.ref_name }}" release-assets/* `
             --title "FluxGate Codex Launcher ${{ github.ref_name }}" `
-            --notes "Open-source Windows launcher, CLI installer, desktop Bridge and mobile web client. This release does not contain or redistribute OpenAI Codex Desktop or Codex CLI binaries; the installer reuses an existing CLI or downloads it from official OpenAI distribution channels at install time."
+            --notes "All-in-one Windows Launcher with an embedded native tray companion. New users only need the Launcher EXE; legacy Node Bridge and mobile-web ZIPs remain advanced assets. This release does not contain or redistribute OpenAI Codex Desktop or Codex CLI binaries; the installer downloads the official standalone CLI into its isolated local directory at install time."

@@ -1,9 +1,9 @@
 ﻿# ============================================================================
-#  FluxGateAI · Codex 一键安装器 (Windows)  v1.0.0
+#  FluxGateAI · Codex 一键安装器 (Windows / 命令行版)  v2.1.0
 # ----------------------------------------------------------------------------
 #  功能：
-#    1. 检测 / 安装官方 OpenAI Codex CLI（npm 或 GitHub 独立二进制，原版不改）
-#    2. 写入 ~/.codex/config.toml，将 Codex 的上游指向 FluxGateAI 网关
+#    1. 在专属目录安装官方 OpenAI Codex CLI 独立二进制
+#    2. 写入隔离 CODEX_HOME/config.toml，将上游指向 FluxGateAI 网关
 #    3. 引导用户粘贴 FluxGate API Key（sk-...）并注入 Codex 登录态
 #    4. 验证网关连通性与 Key 有效性，跑一次最小化冒烟测试
 #
@@ -30,7 +30,6 @@ $GatewayBaseUrl = 'https://api.fluxapi.cloud/v1'      # FluxGate 网关 OpenAI �
 $ConsoleUrl     = 'https://api.fluxapi.cloud'         # 控制台/注册地址（提示用户去建 Key）
 $DefaultModel   = 'gpt-5.4-mini'                      # 默认模型（会对照 /v1/models 校验）
 $GitHubProxy    = ''                                  # 大陆加速可填 'https://gh-proxy.com/'
-$NpmMirror      = 'https://registry.npmmirror.com'    # npm 失败时的镜像回退
 $LauncherDirName = 'FluxGateAICodexLauncher'          # %APPDATA% 下的专属目录名
 # ==============================================================================
 # v2.0：隔离架构。全部文件只写 %APPDATA%\FluxGateAICodexLauncher，绝不修改 ~/.codex。
@@ -55,7 +54,7 @@ function Show-Banner {
     Write-Host '  ============================================================' -ForegroundColor Magenta
     Write-Host ('    ' + $BrandName.ToUpper() + '  x  CODEX') -ForegroundColor Magenta
     Write-Host '  ============================================================' -ForegroundColor Magenta
-    Write-Host ("  $BrandName Codex 一键安装器 v1.0.0") -ForegroundColor White
+    Write-Host ("  $BrandName Codex 一键安装器 v2.1.0") -ForegroundColor White
     Write-Host ("  网关: $GatewayBaseUrl") -ForegroundColor DarkGray
     Write-Host '  ------------------------------------------------------------'
 }
@@ -66,23 +65,9 @@ function Show-Banner {
 $InstallDir = Join-Path $LauncherRoot 'codex-bin'
 
 function Get-CodexCommand {
-    $cmd = Get-Command codex -CommandType Application, ExternalScript -ErrorAction SilentlyContinue | Select-Object -First 1
-    if ($cmd) { return $cmd.Source }
     $local = Join-Path $InstallDir 'codex.exe'
     if (Test-Path -LiteralPath $local) { return $local }
     return $null
-}
-
-function Install-CodexViaNpm {
-    $npm = Get-Command npm -ErrorAction SilentlyContinue
-    if (-not $npm) { return $false }
-    Write-Host '  通过 npm 安装 @openai/codex ...' -ForegroundColor DarkGray
-    & npm install -g @openai/codex 2>&1 | Out-Null
-    if ($LASTEXITCODE -ne 0 -and $NpmMirror) {
-        Write-Warn2 "npm 直连失败，改用镜像 $NpmMirror 重试..."
-        & npm install -g @openai/codex --registry=$NpmMirror 2>&1 | Out-Null
-    }
-    return ($LASTEXITCODE -eq 0)
 }
 
 function Install-CodexStandalone {
@@ -92,7 +77,7 @@ function Install-CodexStandalone {
     if ($GitHubProxy) { $apiUrl = $GitHubProxy.TrimEnd('/') + '/' + $apiUrl }
     $release = Invoke-RestMethod -Uri $apiUrl -Headers @{ 'User-Agent' = "$BrandName-installer" } -TimeoutSec 60
     $asset = $release.assets | Where-Object { $_.name -match $arch -and $_.name -match '\.zip$' } | Select-Object -First 1
-    if (-not $asset) { throw "未在最新 Release 中找到 $arch 的 zip 资产，请改用 npm 方式（先安装 Node.js）。" }
+    if (-not $asset) { throw "未在最新 Release 中找到 $arch 的 zip 资产。" }
     $dlUrl = $asset.browser_download_url
     if ($GitHubProxy) { $dlUrl = $GitHubProxy.TrimEnd('/') + '/' + $dlUrl }
 
@@ -144,7 +129,10 @@ function Write-CodexConfig {
         "name = `"$BrandName`"",
         "base_url = `"$GatewayBaseUrl`"",
         "wire_api = `"responses`"",
-        "requires_openai_auth = true"
+        "requires_openai_auth = true",
+        "",
+        "[windows]",
+        "sandbox = `"unelevated`""
     )
     Set-Content -LiteralPath $configPath -Value ($lines -join [Environment]::NewLine) -Encoding UTF8
     Write-Ok "已写入配置: $configPath"
@@ -275,11 +263,9 @@ if ($codexExe -and -not $Reconfigure) {
     Write-Ok "已检测到 Codex: $codexExe"
 } elseif (-not $codexExe) {
     if ($Reconfigure) { throw '未检测到 Codex，-Reconfigure 需要先完成安装。去掉该参数重新运行即可。' }
-    $installed = $false
-    try { $installed = Install-CodexViaNpm } catch { Write-Warn2 ('npm 安装失败: ' + $_.Exception.Message) }
-    if (-not $installed) { $installed = Install-CodexStandalone }
+    $installed = Install-CodexStandalone
     $codexExe = Get-CodexCommand
-    if (-not $codexExe) { throw 'Codex 安装失败：npm 与独立二进制两条路都未成功。请检查网络后重试，或先手动安装 Node.js。' }
+    if (-not $installed -or -not $codexExe) { throw 'Codex 独立二进制安装失败，请检查网络后重试。' }
     Write-Ok "Codex 安装完成: $codexExe"
 }
 try {

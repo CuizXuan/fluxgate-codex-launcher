@@ -167,6 +167,22 @@
   var API_TICKET = "/api/desktop/bridge/ticket";
   var REGISTER_URL = "https://api.fluxapi.cloud";
   var $ = function(id){ return document.getElementById(id); };
+  var nativeTicketSeq = 0;
+  var nativeTicketTasks = {};
+
+  window.FluxBridgeApp = {
+    onNativeTicket: function(callbackId, success, payload){
+      var task=nativeTicketTasks[callbackId];
+      if(!task) return;
+      delete nativeTicketTasks[callbackId];
+      if(!success){ task.reject(new Error(payload||"无法获取 Bridge 票据")); return; }
+      try{
+        var data=JSON.parse(payload||"{}");
+        if(!data.ticket) throw new Error("原生端未返回 Bridge 票据");
+        task.resolve(data.ticket);
+      }catch(e){ task.reject(e); }
+    }
+  };
 
   var state = {
     apiKey: null,
@@ -203,6 +219,17 @@
   function colorFor(str){
     var h=0; for (var i=0;i<str.length;i++) h=(h*31+str.charCodeAt(i))>>>0;
     var hue=h%360; return "hsl("+hue+",55%,52%)";
+  }
+  function hasNativeBridge(){
+    return !!(window.FluxNative && typeof window.FluxNative.requestBridgeTicket==="function");
+  }
+  function requestNativeTicket(){
+    return new Promise(function(resolve,reject){
+      var callbackId="ticket_"+Date.now()+"_"+(++nativeTicketSeq);
+      nativeTicketTasks[callbackId]={resolve:resolve,reject:reject};
+      try{ window.FluxNative.requestBridgeTicket(callbackId); }
+      catch(e){ delete nativeTicketTasks[callbackId]; reject(e); }
+    });
   }
 
   /* ---------------- 登录 ---------------- */
@@ -248,6 +275,10 @@
       localStorage.removeItem("fluxgate_bridge_api_key");
       localStorage.removeItem("fluxgate_bridge_token");
     }catch(e){}
+    if(hasNativeBridge() && typeof window.FluxNative.closeRemoteCodex==="function"){
+      window.FluxNative.closeRemoteCodex();
+      return;
+    }
     show("login");
   }
 
@@ -257,6 +288,7 @@
     return proto+"//"+location.host+"/api/desktop/bridge/phone";
   }
   function requestTicket(){
+    if(hasNativeBridge()) return requestNativeTicket();
     return fetch(API_TICKET,{method:"POST",headers:{"Authorization":"Bearer "+state.apiKey}})
       .then(function(r){
         return r.json().catch(function(){ return {success:false,message:"服务器无响应"}; })
@@ -340,7 +372,7 @@
     state.devices=list;
     var box=$("devList");
     if(!list.length){
-      box.innerHTML='<div class="empty"><div class="big">🖥️</div>没有在线设备<br>请在电脑上启动 <code>FluxGate Bridge</code><br>登录同一个账号后会自动出现在这里</div>';
+      box.innerHTML='<div class="empty"><div class="big">🖥️</div>没有在线设备<br>请确认电脑右下角的 <code>FluxGateAI Codex</code> 伴侣正在运行</div>';
       return;
     }
     box.innerHTML="";
@@ -469,7 +501,7 @@
   });
 
   /* ---------------- 启动 ---------------- */
-  if(state.apiKey){
+  if(state.apiKey || hasNativeBridge()){
     enterDevices();
   } else {
     show("login");

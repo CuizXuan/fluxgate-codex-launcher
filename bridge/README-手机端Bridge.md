@@ -1,4 +1,6 @@
-# 阶段3：手机端 Connect Bridge — 部署与使用
+# 手机端 Connect Bridge — 高级手动部署
+
+> 普通用户不再需要本目录。`v2.1.0` 起，运行 `FluxGate-Codex-Launcher_<version>.exe` 会安装并启动原生 Windows 托盘伴侣；手机直接在 FluxAI APK 中点“远程”。本目录保留为 Node.js 兼容实现和自托管参考。
 
 对标 `codex.jbbt.cc/connect`：手机浏览器远程给你电脑上的 Codex 发指令。JBB 那句安全说明"消息通过 HTTPS 传输并按账号与设备隔离；Bridge 不读取 Codex/OpenAI 登录凭证"——这套实现逐条对齐。
 
@@ -50,7 +52,13 @@ Hub→设备： {type:"exec",session_id,prompt,cwd} | {type:"cancel",session_id}
 
 **3. 手机页面**：深色移动端，登录→设备列表→聊天，流式显示 Codex 输出，支持停止、断线自动重连、令牌失效自动回登录页、localStorage 记住登录。
 
-## 部署步骤
+## 推荐流程
+
+1. Windows 只安装 Launcher EXE，账号登录并选择项目目录。
+2. 确认右下角存在 `FluxGateAI Codex` 托盘图标。
+3. 手机 FluxAI 使用同一账号登录后点“远程”。
+
+## 手动部署步骤
 
 1. **后端**：重新 `go build` 并重启网关。验证：浏览器开 `https://api.fluxapi.cloud/api/desktop/connect` 应看到登录页。
 2. **电脑端**（每台要远程的电脑各跑一次）：
@@ -81,7 +89,7 @@ Hub→设备： {type:"exec",session_id,prompt,cwd} | {type:"cancel",session_id}
 
 ## 后续增强方向（非必须）
 
-- 把桌面 Bridge 客户端集成进 FluxGate Switch（Tauri 后台常驻），免开命令行窗口。
+- 迁移到 Codex `app-server` 持久会话协议，替代每条消息独立的 `codex exec`。
 - 会话上下文延续（当前每条 prompt 是一次独立 `codex exec`）：改用 codex 会话 resume 或 `codex proto` 长连接。
 - 端到端加密（当前与 JBB 同为"传输加密 + 账号设备隔离"，非 E2EE）。
 - 后端把在线设备落库，支持离线设备列表与最近使用时间。
