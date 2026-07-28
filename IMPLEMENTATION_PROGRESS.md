@@ -1,7 +1,15 @@
 # Implementation Progress
 
 ## Current Focus
-- Publish v2.2.0 as a beginner-ready Full Windows package with the official Codex CLI, native Bridge companion, and Microsoft Store Codex Desktop setup in one installer flow.
+- v2.2.0 Full Launcher is published and independently verified; monitor normal first-run feedback.
+
+## Latest Update - 2026-07-28 15:30
+- Scope: Complete the corrected v2.2.0 release and independently verify every public asset.
+- Completed: Published commits `eb4feeb` and `0f10e65`, tagged the release commit, completed GitHub Actions run `30337489114`, and released eight public assets at `https://github.com/CuizXuan/fluxgate-codex-launcher/releases/tag/v2.2.0`.
+- Validation: Downloaded all public assets. Every local file size and SHA-256 matched the GitHub asset metadata; the public Full EXE was 120,107,520 bytes with SHA-256 `9181045dd0b06ab720323abd312a8d2a3175fc94363707bc1ebc46525f5d3db4`, passed `--self-test-full`, and exposed all five expected embedded resources. The public Bridge and Mobile Web ZIPs contained zero Codex executables or `app.asar` files.
+- Problems / Blockers: None.
+- Not Done: None for v2.2.0.
+- Next: Recommend `FluxGate-Codex-Full_2.2.0.exe` to new Windows x64 users; retain the online Launcher and ZIPs only for advanced/manual deployments.
 
 ## Latest Update - 2026-07-28 15:05
 - Scope: Build and validate the v2.2.0 Full Launcher requested for users who expect a complete, ready-to-run package rather than a small online bootstrapper.
@@ -94,3 +102,4 @@
 - [x] Validate the native companion against the production Bridge.
 - [x] Publish and verify the v2.1.0 GitHub Release assets.
 - [x] Publish and verify the v2.1.1 CLI repair release.
+- [x] Build, publish, install, and independently verify the v2.2.0 Full Launcher.
