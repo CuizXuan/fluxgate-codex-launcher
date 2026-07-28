@@ -36,6 +36,14 @@
 - Not Done: Commit, push, v2.1.1 tag, GitHub Release workflow, and published-asset verification.
 - Next: Publish v2.1.1 immediately and direct v2.1.0 users to rerun the patch installer for automatic repair.
 
+## Latest Update - 2026-07-28 14:20
+- Scope: Publish and independently verify the v2.1.1 CLI repair release.
+- Completed: Pushed commit `c9834a4`, tagged `v2.1.1`, and published all seven assets through the Windows release workflow.
+- Validation: The public workflow passed; all seven assets downloaded successfully; the public EXE self-test passed; the published GUI script contains the exact official main-asset selector and automatic terminal launch; and the Bridge/mobile ZIPs contain no Codex executable or `app.asar`.
+- Problems / Blockers: None in v2.1.1.
+- Not Done: None for the v2.1.1 repair release.
+- Next: Treat v2.1.1 as the minimum supported Launcher version and monitor first-run downloads on additional Windows architectures.
+
 ## Latest Update - 2026-07-27 22:55
 - Scope: Repair the v2.0.0 production integration and prepare a validated patch release.
 - Completed: Confirmed the repository is clean at `v2.0.0`.
@@ -70,4 +78,4 @@
 - [x] Stop reusing or updating the user's global Codex CLI.
 - [x] Validate the native companion against the production Bridge.
 - [x] Publish and verify the v2.1.0 GitHub Release assets.
-- [ ] Publish and verify the v2.1.1 CLI repair release.
+- [x] Publish and verify the v2.1.1 CLI repair release.
