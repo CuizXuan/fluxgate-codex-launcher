@@ -77,6 +77,29 @@ test("GUI installation opens the local Codex terminal", async () => {
   assert.match(cli, /Start-Process -FilePath \$launcherCmd -WorkingDirectory/);
 });
 
+test("Full Launcher bundles CLI and legal resources and configures Store Desktop", async () => {
+  const bootstrapper = await source("src/LauncherBootstrapper.cs");
+  const build = await source("build/build-release.ps1");
+  const gui = await source("installer/FluxGate-Codex-Setup-GUI.ps1");
+
+  assert.match(bootstrapper, /FluxGate\.CodexLauncher\.OfficialCodexArchive/);
+  assert.match(bootstrapper, /FluxGate\.CodexLauncher\.Notice/);
+  assert.match(bootstrapper, /FluxGate\.CodexLauncher\.ThirdPartyLicenses/);
+  assert.match(bootstrapper, /--self-test-full/);
+  assert.match(bootstrapper, /FLUXGATE_CODEX_ARCHIVE/);
+  assert.match(build, /codex-x86_64-pc-windows-msvc\.exe\.zip/);
+  assert.match(build, /codex-command-runner\.exe/);
+  assert.match(build, /codex-windows-sandbox-setup\.exe/);
+  assert.match(build, /Official Codex CLI release does not provide a SHA-256 digest/);
+  assert.match(gui, /Get-AppxPackage -Name 'OpenAI\.Codex'/);
+  assert.match(gui, /'9PLM9XGG6VKS'/);
+  assert.match(gui, /--user-data-dir=/);
+  assert.match(gui, /EnvironmentVariables\['CODEX_HOME'\]/);
+  assert.match(gui, /\$lines\[\$index\] = 'model = "'/);
+  assert.match(gui, /NOTICE\.txt/);
+  assert.match(gui, /THIRD-PARTY-LICENSES\.md/);
+});
+
 test("downloadable mobile page uses one-use Bridge tickets", async () => {
   const mobile = await source("mobile-web/index.html");
   const embedded = await source("server-integration/desktop_connect.html");

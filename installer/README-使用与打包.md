@@ -9,16 +9,17 @@ GUI 与命令行安装器都使用独立目录：
 |-- companion\FluxGate-Codex-Companion.exe
 |-- companion.json
 |-- logs\
-|-- FluxGateAI Codex.cmd
+|-- FluxGateAI Codex Desktop.cmd
+|-- Launch-FluxGate-Codex-Desktop.ps1
 |-- FluxGateAI Codex 终端.cmd
 `-- 卸载.cmd
 ```
 
-安装器不会把 Codex Desktop 或 Codex CLI 二进制打进本仓库、EXE 或 GitHub Release。安装时从官方 `openai/codex` GitHub Releases 下载对应 Windows CLI，并固定放入专属 `codex-bin`，不复用或修改系统全局 CLI。
+Full EXE 内嵌从官方 `openai/codex` Release 下载并校验的 Apache-2.0 Codex CLI ZIP；在线 EXE 安装时下载同一资产。两者都固定安装到专属 `codex-bin`，不复用或修改系统全局 CLI。
 
 GUI EXE 内嵌 FluxGateAI 自有的原生托盘伴侣。账号登录会自动获得 `desktop-codex` 专用 Key，安装后伴侣直接后台连接，不需要 Node.js、Bridge ZIP 或终端窗口。
 
-GUI 中的 Codex Desktop 复用选项默认关闭。用户主动启用时，只会在用户电脑上从已安装的官方 Desktop 创建本地副本；该副本不会上传或进入发布物。
+GUI 默认检测并通过 Microsoft Store 产品 ID `9PLM9XGG6VKS` 安装官方 Codex Desktop。Store 包本身不被复制或重新发布；Launcher 生成隔离启动器，使用独立浏览器数据目录和 `CODEX_HOME`，并在启动前恢复安装时选定的模型。
 
 ## 隔离行为
 
@@ -34,7 +35,7 @@ GUI 中的 Codex Desktop 复用选项默认关闭。用户主动启用时，只�
 在仓库根目录运行：
 
 ```powershell
-.\build\build-release.ps1 -Version 2.1.1
+.\build\build-release.ps1 -Version 2.2.0 -BuildFull
 ```
 
-生成的 EXE 嵌入 `FluxGate-Codex-Setup-GUI.ps1` 和本仓库编译的原生伴侣，不嵌入任何 OpenAI 文件。
+构建会生成小型在线 Launcher 和内嵌官方 Codex CLI ZIP 的 Full Launcher。Codex Desktop 仍由 Microsoft Store 安装，不进入任一 EXE。

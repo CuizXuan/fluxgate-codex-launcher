@@ -10,6 +10,7 @@ Transitive dependencies should be audited before a final external release.
 
 | Area        | Scope       | Ecosystem | Dependency                                            | Version                              | License                                            |
 |-------------|-------------|-----------|-------------------------------------------------------|--------------------------------------|----------------------------------------------------|
+| launcher    | production  | Rust      | `openai/codex` CLI                                    | downloaded from the tagged build     | Apache-2.0                                         |
 | backend     | production  | Go        | `github.com/Calcium-Ion/go-epay`                      | `v0.0.4`                             | Proprietary/Internal - owned by project maintainer |
 | backend     | production  | Go        | `github.com/abema/go-mp4`                             | `v1.4.1`                             | MIT                                                |
 | backend     | production  | Go        | `github.com/andybalholm/brotli`                       | `v1.1.1`                             | MIT                                                |
@@ -372,4 +373,3 @@ this software, either in source code form or as a compiled binary, for any
 purpose, commercial or non-commercial, and by any means.
 
 For more information, please refer to https://unlicense.org/
-

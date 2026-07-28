@@ -1,8 +1,15 @@
 # Implementation Progress
 
 ## Current Focus
-- Integrate the desktop Bridge into the Windows Launcher as a background companion with no Node.js or terminal workflow.
-- Reuse the isolated Launcher credentials and `CODEX_HOME`, add project selection and startup registration, and keep the legacy ZIPs only for advanced use.
+- Publish v2.2.0 as a beginner-ready Full Windows package with the official Codex CLI, native Bridge companion, and Microsoft Store Codex Desktop setup in one installer flow.
+
+## Latest Update - 2026-07-28 15:05
+- Scope: Build and validate the v2.2.0 Full Launcher requested for users who expect a complete, ready-to-run package rather than a small online bootstrapper.
+- Completed: Embedded the exact official x64 Codex CLI ZIP, native companion, GUI installer, NOTICE, and third-party licenses into a 120,105,984-byte Full EXE. Added Microsoft Store Codex Desktop installation/detection, an isolated Desktop profile and `CODEX_HOME`, automatic Desktop plus CLI launch, model restoration, and content scanning for advanced Bridge/mobile ZIPs.
+- Validation: Seven production contract tests, PowerShell/XAML parsing, native companion integration, Full/online resource self-tests, ZIP entry and SHA-256 checks, and a real Full GUI upgrade installation passed. The installed Codex CLI 0.145.0 returned `FULL_CLI_OK` through `gpt-5.4-mini`; the installed companion completed the production ticket/WSS/real-CLI loop; and the Store Desktop ran as a second process with the isolated `desktop-data` path while the global `~/.codex/config.toml` remained unchanged.
+- Problems / Blockers: Official Codex Desktop is a licensed Microsoft Store MSIX with package identity and cannot be legally or technically repacked as a portable payload; the Full installer handles it through Store product `9PLM9XGG6VKS` instead.
+- Not Done: Commit, push, v2.2.0 tag, GitHub Release workflow, and independent public-asset verification.
+- Next: Publish v2.2.0, download the public Full EXE, rerun resource checks, and confirm advanced ZIPs remain free of Codex Desktop/CLI payloads.
 
 ## Latest Update - 2026-07-28 12:00
 - Scope: Replace the multi-terminal Launcher + Node Bridge flow with a beginner-ready integrated Windows experience.

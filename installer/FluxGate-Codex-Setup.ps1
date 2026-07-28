@@ -1,5 +1,5 @@
 ﻿# ============================================================================
-#  FluxGateAI · Codex 一键安装器 (Windows / 命令行版)  v2.1.1
+#  FluxGateAI · Codex 一键安装器 (Windows / 命令行版)  v2.2.0
 # ----------------------------------------------------------------------------
 #  功能：
 #    1. 在专属目录安装官方 OpenAI Codex CLI 独立二进制
@@ -54,7 +54,7 @@ function Show-Banner {
     Write-Host '  ============================================================' -ForegroundColor Magenta
     Write-Host ('    ' + $BrandName.ToUpper() + '  x  CODEX') -ForegroundColor Magenta
     Write-Host '  ============================================================' -ForegroundColor Magenta
-    Write-Host ("  $BrandName Codex 一键安装器 v2.1.1") -ForegroundColor White
+    Write-Host ("  $BrandName Codex 一键安装器 v2.2.0") -ForegroundColor White
     Write-Host ("  网关: $GatewayBaseUrl") -ForegroundColor DarkGray
     Write-Host '  ------------------------------------------------------------'
 }

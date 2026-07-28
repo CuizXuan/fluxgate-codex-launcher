@@ -4,25 +4,26 @@ FluxGate Codex Launcher is a community-maintained Windows installer and remote B
 
 ## Beginner flow
 
-1. Download and run `FluxGate-Codex-Launcher_<version>.exe`.
+1. Download and run `FluxGate-Codex-Full_<version>.exe`.
 2. Sign in with a FluxGateAI account and choose the project folder.
-3. Installation opens a ready-to-use Codex CLI terminal, starts the native Bridge companion in the Windows tray, and enables companion startup by default.
+3. Installation sets up the bundled Codex CLI, installs or detects official Codex Desktop through Microsoft Store, opens both desktop and terminal surfaces, starts the native Bridge companion, and enables companion startup by default.
 4. Open the FluxAI Android app and tap `远程`; the saved account credential is exchanged for one-use Bridge tickets automatically.
 
-No Node.js, Bridge ZIP, terminal window, browser login, or second desktop credential is required in this flow.
+No Node.js, Bridge ZIP, manual terminal setup, browser login, or second FluxGateAI credential is required in this flow.
 
 ## Downloads
 
 Stable files are published only through [GitHub Releases](https://github.com/CuizXuan/fluxgate-codex-launcher/releases/latest).
 
-- `FluxGate-Codex-Launcher_<version>.exe`: recommended all-in-one graphical installer with the native tray companion embedded.
+- `FluxGate-Codex-Full_<version>.exe`: recommended x64 package with the official Apache-2.0 Codex CLI archive, graphical installer, and native tray companion embedded.
+- `FluxGate-Codex-Launcher_<version>.exe`: smaller online installer that downloads the same official Codex CLI during setup.
 - `FluxGate-Codex-Setup-GUI.ps1`: auditable GUI installer source.
 - `FluxGate-Codex-Setup.ps1`: command-line installer.
 - `Install-FluxGate-Codex*.bat`: double-click entry points.
 - `FluxGate-Codex-Bridge_<version>.zip`: legacy Node.js Bridge for advanced/manual deployments.
 - `FluxGate-Codex-Mobile-Web_<version>.zip`: self-contained mobile web source for advanced/self-hosted deployments.
 
-No release asset contains Codex Desktop, Codex CLI, `app.asar`, or any other OpenAI binary. During installation the Launcher downloads the official standalone Codex CLI into its own `%APPDATA%\FluxGateAICodexLauncher\codex-bin` directory. It does not reuse, update, or uninstall the user's global Codex CLI. The optional Desktop mode only copies an already-installed Codex Desktop locally after explicit user selection; it is disabled by default and never enters this repository or its Releases.
+The Full package embeds the official Apache-2.0 Codex CLI ZIP from `openai/codex`; the online package downloads that same signed release asset during installation. Both install it into `%APPDATA%\FluxGateAICodexLauncher\codex-bin` and do not reuse, update, or uninstall the user's global Codex CLI. The Launcher also installs its bundled `NOTICE` and third-party license file beside the isolated runtime. Official Codex Desktop remains a Microsoft Store package and is installed/detected through product ID `9PLM9XGG6VKS`; its 1.95 GB Store payload, license, and `app.asar` are not repackaged. Launcher starts it with an isolated profile and `CODEX_HOME` connected to FluxGateAI.
 
 ## Source layout
 
@@ -39,10 +40,10 @@ No release asset contains Codex Desktop, Codex CLI, `app.asar`, or any other Ope
 Requirements: Windows PowerShell 5.1, the inbox .NET Framework C# compiler, and Node.js.
 
 ```powershell
-.\build\build-release.ps1 -Version 2.1.1
+.\build\build-release.ps1 -Version 2.2.0 -BuildFull
 ```
 
-The build validates PowerShell and Bridge syntax, compiles and integration-tests the native companion, embeds it with the GUI installer, runs resource self-tests, and creates the advanced Bridge/mobile ZIP assets. The EXE contains FluxGateAI installer/companion code only; it is not an archive of Codex itself.
+The build validates PowerShell and Bridge syntax, compiles and integration-tests the native companion, builds the online Launcher, downloads and verifies the official x64 Codex CLI ZIP for the Full Launcher, runs resource self-tests, and creates the advanced Bridge/mobile ZIP assets.
 
 ## Attribution and license
 

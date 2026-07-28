@@ -24,15 +24,32 @@ jobs:
         shell: powershell
         run: |
           $version = "${{ github.ref_name }}".TrimStart('v')
-          .\build\build-release.ps1 -Version $version
+          .\build\build-release.ps1 -Version $version -BuildFull
 
-      - name: Confirm no official Codex binaries are packaged
+      - name: Validate Full and advanced assets
         shell: powershell
         run: |
-          $unexpected = Get-ChildItem release-assets -File -Recurse | Where-Object {
-            $_.Name -match '^codex(\.exe)?$|app\.asar'
+          $full = Get-ChildItem release-assets -Filter 'FluxGate-Codex-Full_*.exe' | Select-Object -First 1
+          if (-not $full -or $full.Length -lt 100MB) { throw "Full Launcher is missing or unexpectedly small" }
+          & $full.FullName --self-test-full
+          if ($LASTEXITCODE -ne 0) { throw "Full Launcher resource test failed" }
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $advanced = @(Get-ChildItem release-assets -Filter '*.zip')
+          $unexpected = @($advanced | Where-Object { $_.Name -notmatch '^FluxGate-Codex-(Bridge|Mobile-Web)_' })
+          if ($unexpected.Count -gt 0) { throw "Unexpected standalone ZIP found in release assets" }
+          foreach ($asset in $advanced) {
+            $zip = [IO.Compression.ZipFile]::OpenRead($asset.FullName)
+            try {
+              $forbidden = @($zip.Entries | Where-Object {
+                $_.FullName.Replace('\', '/') -match '(?i)(^|/)(codex(?:-[^/]+)?\.exe|app\.asar)$'
+              })
+              if ($forbidden.Count -gt 0) {
+                throw "Advanced ZIP contains an official Codex payload: $($asset.Name):$($forbidden[0].FullName)"
+              }
+            } finally {
+              $zip.Dispose()
+            }
           }
-          if ($unexpected) { throw "Official Codex binary found in release assets" }
 
       - name: Publish GitHub Release
         shell: powershell
@@ -41,4 +58,4 @@ jobs:
         run: |
           gh release create "${{ github.ref_name }}" release-assets/* `
             --title "FluxGate Codex Launcher ${{ github.ref_name }}" `
-            --notes "All-in-one Windows Launcher with an embedded native tray companion. New users only need the Launcher EXE; legacy Node Bridge and mobile-web ZIPs remain advanced assets. This release does not contain or redistribute OpenAI Codex Desktop or Codex CLI binaries; the installer downloads the official standalone CLI into its isolated local directory at install time."
+            --notes "Use FluxGate-Codex-Full for the beginner-ready x64 package with the official Apache-2.0 Codex CLI archive, graphical installer, and native tray companion embedded. It installs or detects official Codex Desktop through Microsoft Store product 9PLM9XGG6VKS and launches it with an isolated FluxGateAI profile; the Store desktop payload itself is not repackaged. The smaller Launcher remains available for online CLI installation, while Bridge and mobile-web ZIPs are advanced assets."

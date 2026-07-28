@@ -1,11 +1,11 @@
 ﻿# ============================================================================
-#  FluxGateAI · Codex 一键安装器 (Windows / 图形界面版)  v2.1.1
+#  FluxGateAI · Codex 一键安装器 (Windows / 图形界面版)  v2.2.0
 # ----------------------------------------------------------------------------
 #  隔离 Launcher 架构：
 #    %APPDATA%\FluxGateAICodexLauncher\
 #      codex-home\   独立 CODEX_HOME（config.toml / auth.json，只写这里）
 #      codex-bin\    独立 CLI 二进制（不改全局 PATH）
-#      app\          可选的 Codex Desktop 本地副本（发布物不包含官方二进制）
+#      desktop-data\ 官方 Codex Desktop 的独立用户数据（Store 包本体不复制）
 #      logs\         安装日志
 #    ！！本安装器绝不写入 ~/.codex，不影响你现有的 Codex / Codex Desktop。
 #    首次运行会检测 v1 版对 ~/.codex 的修改并自动还原备份。
@@ -22,7 +22,7 @@ $GatewayBaseUrl = 'https://api.fluxapi.cloud/v1'
 $SiteBaseUrl    = 'https://api.fluxapi.cloud'         # 控制台 / desktop API 根地址
 $DefaultModel   = 'gpt-5.4-mini'
 $GitHubProxy    = ''                                  # 大陆加速可填 'https://gh-proxy.com/'
-$AppVersion     = 'v2.1.1'
+$AppVersion     = 'v2.2.0'
 $LauncherDirName = 'FluxGateAICodexLauncher'          # %APPDATA% 下的专属目录名
 # ==========================================================================
 
@@ -240,8 +240,8 @@ $xamlText = @'
               <CheckBox x:Name="ChkStartup" IsChecked="True" Margin="0,8,0,0" FontSize="12">
                 <TextBlock Text="开机后自动连接手机端" Foreground="{StaticResource MutedBrush}" FontSize="12"/>
               </CheckBox>
-              <CheckBox x:Name="ChkDesktop" IsChecked="False" Margin="0,8,0,0" FontSize="12">
-                <TextBlock Text="复用本机已安装的 Codex Desktop（仅本地复制；发布包不含官方程序）" Foreground="{StaticResource MutedBrush}" FontSize="12" TextWrapping="Wrap"/>
+              <CheckBox x:Name="ChkDesktop" IsChecked="True" Margin="0,8,0,0" FontSize="12">
+                <TextBlock Text="安装并启动官方 Codex Desktop（通过 Microsoft Store，使用独立 FluxGateAI 配置）" Foreground="{StaticResource MutedBrush}" FontSize="12" TextWrapping="Wrap"/>
               </CheckBox>
               <CheckBox x:Name="ChkSmoke" IsChecked="True" Margin="0,8,0,0" FontSize="12">
                 <TextBlock Text="安装完成后运行连通性测试（消耗少量 token）" Foreground="{StaticResource MutedBrush}" FontSize="12"/>
@@ -288,6 +288,7 @@ $xamlText = @'
             </StackPanel>
           </Border>
           <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,18,0,0">
+            <Button x:Name="BtnDesktop" Style="{StaticResource PrimaryBtn}" Content="打开桌面版" Margin="0,0,10,0" Visibility="Collapsed"/>
             <Button x:Name="BtnLaunch" Style="{StaticResource PrimaryBtn}" Content="打开 Codex 终端" Margin="0,0,10,0"/>
             <Button x:Name="BtnOpenDir" Style="{StaticResource GhostBtn}" Content="打开安装目录" Margin="0,0,10,0"/>
             <Button x:Name="BtnFinish" Style="{StaticResource GhostBtn}" Content="完 成"/>
@@ -314,7 +315,7 @@ foreach ($name in @('TitleBar','BtnMin','BtnClose','PanelForm','PanelProgress','
         'ModeAccount','ModeApiKey','AccountFields','KeyFields','UserBox','PassBox',
         'KeyBox','KeyBoxPlain','BtnEye','BtnGetKey','ModelBox','ModelHint','BtnValidate',
         'WorkdirBox','BtnBrowseWorkdir','ChkCompanion','ChkStartup','ChkDesktop','ChkSmoke','BtnInstall','FormStatus','StageText','ProgFill','PctText',
-        'LogBox','LogScroll','DoneSub','DoneShortcuts','BtnLaunch','BtnOpenDir','BtnFinish')) {
+        'LogBox','LogScroll','DoneSub','DoneShortcuts','BtnDesktop','BtnLaunch','BtnOpenDir','BtnFinish')) {
     Set-Variable -Name $name -Value $window.FindName($name)
 }
 $ModelBox.Items.Add($DefaultModel) | Out-Null
@@ -398,7 +399,6 @@ $workerScript = {
         $root      = $cfg.LauncherRoot
         $codexHome = Join-Path $root 'codex-home'
         $binDir    = Join-Path $root 'codex-bin'
-        $appDir    = Join-Path $root 'app'
         $companionDir = Join-Path $root 'companion'
         $logsDir   = Join-Path $root 'logs'
 
@@ -427,6 +427,12 @@ $workerScript = {
         foreach ($d in @($root, $codexHome, $binDir, $companionDir, $logsDir)) {
             New-Item -ItemType Directory -Path $d -Force | Out-Null
         }
+        if ($cfg.NoticeSource -and (Test-Path -LiteralPath $cfg.NoticeSource -PathType Leaf)) {
+            Copy-Item -LiteralPath $cfg.NoticeSource -Destination (Join-Path $root 'NOTICE.txt') -Force
+        }
+        if ($cfg.ThirdPartyLicensesSource -and (Test-Path -LiteralPath $cfg.ThirdPartyLicensesSource -PathType Leaf)) {
+            Copy-Item -LiteralPath $cfg.ThirdPartyLicensesSource -Destination (Join-Path $root 'THIRD-PARTY-LICENSES.md') -Force
+        }
         Log ('目录就绪: ' + $root)
 
         # 2. Codex CLI（始终使用专属目录中的官方独立版，不复用或修改全局 CLI）
@@ -447,24 +453,35 @@ $workerScript = {
             }
         }
         if (-not $cliPath) {
-            Log '从 OpenAI GitHub Releases 下载官方独立二进制...'
             $arch = if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'aarch64-pc-windows' } else { 'x86_64-pc-windows' }
             $assetName = 'codex-' + $arch + '-msvc.exe.zip'
-            $apiUrl = 'https://api.github.com/repos/openai/codex/releases/latest'
-            if ($cfg.GitHubProxy) { $apiUrl = $cfg.GitHubProxy.TrimEnd('/') + '/' + $apiUrl }
-            $release = Invoke-RestMethod -Uri $apiUrl -Headers @{ 'User-Agent' = 'fluxgate-installer' } -TimeoutSec 60
-            $asset = $release.assets | Where-Object { $_.name -eq $assetName } | Select-Object -First 1
-            if (-not $asset) { throw ('未找到官方 Codex CLI 主资产: ' + $assetName) }
-            $dlUrl = $asset.browser_download_url
-            if ($cfg.GitHubProxy) { $dlUrl = $cfg.GitHubProxy.TrimEnd('/') + '/' + $dlUrl }
+            $embeddedArchive = [string]$cfg.CodexArchive
+            $asset = $null
+            $dlUrl = $null
+            if (-not [string]::IsNullOrWhiteSpace($embeddedArchive) -and (Test-Path -LiteralPath $embeddedArchive -PathType Leaf)) {
+                Log '使用 Full 安装包内嵌的官方 Codex CLI...'
+            } else {
+                Log '从 OpenAI GitHub Releases 下载官方独立二进制...'
+                $apiUrl = 'https://api.github.com/repos/openai/codex/releases/latest'
+                if ($cfg.GitHubProxy) { $apiUrl = $cfg.GitHubProxy.TrimEnd('/') + '/' + $apiUrl }
+                $release = Invoke-RestMethod -Uri $apiUrl -Headers @{ 'User-Agent' = 'fluxgate-installer' } -TimeoutSec 60
+                $asset = $release.assets | Where-Object { $_.name -eq $assetName } | Select-Object -First 1
+                if (-not $asset) { throw ('未找到官方 Codex CLI 主资产: ' + $assetName) }
+                $dlUrl = $asset.browser_download_url
+                if ($cfg.GitHubProxy) { $dlUrl = $cfg.GitHubProxy.TrimEnd('/') + '/' + $dlUrl }
+            }
             $tmpZip = Join-Path $env:TEMP ('codex-' + [guid]::NewGuid().ToString('N') + '.zip')
             $tmpDir = Join-Path $env:TEMP ('codex-unzip-' + [guid]::NewGuid().ToString('N'))
             try {
-                Invoke-WebRequest -Uri $dlUrl -OutFile $tmpZip -UseBasicParsing -TimeoutSec 600
-                $expectedDigest = [string]$asset.digest
-                if ($expectedDigest -match '^sha256:([0-9a-fA-F]{64})$') {
-                    $actualDigest = (Get-FileHash -Algorithm SHA256 -LiteralPath $tmpZip).Hash
-                    if ($actualDigest -ne $Matches[1]) { throw '官方 Codex CLI 下载文件校验失败' }
+                if ($dlUrl) {
+                    Invoke-WebRequest -Uri $dlUrl -OutFile $tmpZip -UseBasicParsing -TimeoutSec 600
+                    $expectedDigest = [string]$asset.digest
+                    if ($expectedDigest -match '^sha256:([0-9a-fA-F]{64})$') {
+                        $actualDigest = (Get-FileHash -Algorithm SHA256 -LiteralPath $tmpZip).Hash
+                        if ($actualDigest -ne $Matches[1]) { throw '官方 Codex CLI 下载文件校验失败' }
+                    }
+                } else {
+                    Copy-Item -LiteralPath $embeddedArchive -Destination $tmpZip -Force
                 }
                 Expand-Archive -LiteralPath $tmpZip -DestinationPath $tmpDir -Force
                 $mainName = 'codex-' + $arch + '-msvc.exe'
@@ -490,67 +507,39 @@ $workerScript = {
         } catch {}
         $sync.Summary.CliPath = $cliPath
 
-        # 3. 可选复用本机 Codex Desktop。此操作只在用户电脑本地复制，发布物不包含官方二进制。
+        # 3. 官方 Codex Desktop 保持 Microsoft Store 包身份；Launcher 只负责安装检测和隔离启动。
         $desktopExe = $null
         if ($cfg.BundleDesktop) {
-            Stage '查找已安装的 Codex Desktop' 30
-            $candidates = New-Object System.Collections.Generic.List[string]
-            foreach ($p in @(
-                (Join-Path $env:LOCALAPPDATA 'Programs\Codex'),
-                (Join-Path $env:LOCALAPPDATA 'Programs\codex'),
-                (Join-Path $env:LOCALAPPDATA 'Programs\Codex Desktop'),
-                (Join-Path $env:ProgramFiles 'Codex')
-            )) { if ($p) { $candidates.Add($p) } }
-            foreach ($regRoot in @(
-                'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall',
-                'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall',
-                'HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall'
-            )) {
-                Get-ChildItem $regRoot -ErrorAction SilentlyContinue | ForEach-Object {
-                    $ip = Get-ItemProperty $_.PSPath -ErrorAction SilentlyContinue
-                    if ($ip.DisplayName -and $ip.DisplayName -match '^Codex') {
-                        if ($ip.InstallLocation) { $candidates.Add([string]$ip.InstallLocation) }
-                        elseif ($ip.DisplayIcon) { $candidates.Add((Split-Path ([string]$ip.DisplayIcon -replace '",.*$', '' -replace '^"', '') -Parent)) }
+            Stage '检查官方 Codex Desktop' 30
+            $desktopPackage = Get-AppxPackage -Name 'OpenAI.Codex' -ErrorAction SilentlyContinue |
+                              Sort-Object Version -Descending | Select-Object -First 1
+            if (-not $desktopPackage) {
+                $winget = Get-Command 'winget.exe' -ErrorAction SilentlyContinue | Select-Object -First 1
+                if ($winget) {
+                    Log '正在通过 Microsoft Store 安装官方 Codex Desktop...'
+                    $desktopInstall = Start-Process -FilePath $winget.Source -ArgumentList @(
+                        'install', '--id', '9PLM9XGG6VKS', '--source', 'msstore', '--exact',
+                        '--accept-package-agreements', '--accept-source-agreements', '--disable-interactivity'
+                    ) -Wait -PassThru -WindowStyle Hidden
+                    if ($desktopInstall.ExitCode -ne 0) {
+                        Log ('Microsoft Store 安装返回 ' + $desktopInstall.ExitCode + '，将打开商店页面')
                     }
+                    $desktopPackage = Get-AppxPackage -Name 'OpenAI.Codex' -ErrorAction SilentlyContinue |
+                                      Sort-Object Version -Descending | Select-Object -First 1
+                }
+                if (-not $desktopPackage) {
+                    Start-Process 'ms-windows-store://pdp/?ProductId=9PLM9XGG6VKS'
+                    Log '已打开 Microsoft Store；完成官方 Codex Desktop 安装后可重新运行 Launcher'
                 }
             }
-            $sourceDir = $null
-            foreach ($cand in ($candidates | Select-Object -Unique)) {
-                if ([string]::IsNullOrWhiteSpace($cand)) { continue }
-                if (-not (Test-Path -LiteralPath $cand)) { continue }
-                $marker = (Test-Path -LiteralPath (Join-Path $cand 'resources\app.asar')) -or
-                          (Test-Path -LiteralPath (Join-Path $cand 'resources\codex.exe'))
-                $topExe = Get-ChildItem -LiteralPath $cand -Filter '*.exe' -ErrorAction SilentlyContinue |
-                          Where-Object { $_.Name -notmatch 'uninstall|elevate|setup' } | Select-Object -First 1
-                if ($marker -and $topExe) { $sourceDir = $cand; break }
-            }
-            if ($sourceDir) {
-                Stage ('复制 Codex Desktop 为专属副本（源: ' + $sourceDir + '）') 34
-                Log '原版安装不会被修改，只做文件复制，可能需要 1-3 分钟...'
-                if (Test-Path -LiteralPath $appDir) {
-                    $old = Join-Path $root ('app.old-' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
-                    Move-Item -LiteralPath $appDir -Destination $old -ErrorAction SilentlyContinue
-                    if (Test-Path -LiteralPath $appDir) { Remove-Item -LiteralPath $appDir -Recurse -Force -ErrorAction SilentlyContinue }
-                    else { Log ('旧副本已挪到: ' + $old) }
-                }
-                # 路径末尾的反斜杠会和结尾引号连成 \" —— Windows 命令行解析器把它当成
-                # 转义引号，整条 robocopy 参数就此错位。注册表卸载项里的路径常带尾部反斜杠。
-                $srcArg = $sourceDir.TrimEnd('\')
-                $dstArg = $appDir.TrimEnd('\')
-                $rc = Start-Process -FilePath 'robocopy.exe' -ArgumentList @('"' + $srcArg + '"', '"' + $dstArg + '"', '/E', '/NJH', '/NJS', '/NFL', '/NDL', '/R:1', '/W:1') -Wait -PassThru -WindowStyle Hidden
-                if ($rc.ExitCode -ge 8) { throw ('复制 Codex Desktop 失败（robocopy 退出码 ' + $rc.ExitCode + '）') }
-                $exeItem = Get-ChildItem -LiteralPath $appDir -Filter '*.exe' -ErrorAction SilentlyContinue |
-                           Where-Object { $_.Name -notmatch 'uninstall|elevate|setup' } |
-                           Sort-Object Length -Descending | Select-Object -First 1
-                if ($exeItem) {
-                    $desktopExe = $exeItem.FullName
-                    Log ('专属桌面版就绪: ' + $desktopExe)
-                    Log '提醒：请勿与官方 Codex Desktop 同时运行，二者会争抢应用数据目录'
+            if ($desktopPackage) {
+                $desktopExe = Join-Path $desktopPackage.InstallLocation 'app\ChatGPT.exe'
+                if (-not (Test-Path -LiteralPath $desktopExe -PathType Leaf)) {
+                    $desktopExe = $null
+                    Log '官方 Codex Desktop 包存在，但未找到主程序'
                 } else {
-                    Log '副本中未找到主程序，回退为终端模式'
+                    Log ('官方 Codex Desktop 已就绪: ' + $desktopPackage.Version)
                 }
-            } else {
-                Log '未检测到已安装的 Codex Desktop，本次为终端模式（可先安装官方桌面版再重跑本安装器）'
             }
         }
         $sync.Summary.DesktopExe = $desktopExe
@@ -684,12 +673,53 @@ $workerScript = {
         $launchTarget = $terminalCmd
         $desktopCmd = $null
         if ($desktopExe) {
-            $desktopCmd = Join-Path $root ($cfg.BrandName + ' Codex.cmd')
+            $desktopPs1 = Join-Path $root 'Launch-FluxGate-Codex-Desktop.ps1'
+            $desktopProfile = Join-Path $root 'desktop-data'
+            $desktopScript = @'
+$ErrorActionPreference = 'Stop'
+$codexHome = '__CODEX_HOME__'
+$codexBin = '__CODEX_BIN__'
+$configPath = Join-Path $codexHome 'config.toml'
+$requiredModel = '__MODEL__'
+$lines = @(Get-Content -LiteralPath $configPath -Encoding UTF8)
+$modelUpdated = $false
+for ($index = 0; $index -lt $lines.Count; $index++) {
+    if (-not $modelUpdated -and $lines[$index] -match '^model\s*=') {
+        $lines[$index] = 'model = "' + $requiredModel.Replace('"', '\"') + '"'
+        $modelUpdated = $true
+    }
+}
+if (-not $modelUpdated) { $lines = @('model = "' + $requiredModel.Replace('"', '\"') + '"') + $lines }
+Set-Content -LiteralPath $configPath -Value ($lines -join [Environment]::NewLine) -Encoding UTF8
+
+$package = Get-AppxPackage -Name 'OpenAI.Codex' -ErrorAction SilentlyContinue |
+           Sort-Object Version -Descending | Select-Object -First 1
+if (-not $package) { throw '未安装官方 Codex Desktop，请重新运行 Launcher' }
+$desktopExe = Join-Path $package.InstallLocation 'app\ChatGPT.exe'
+if (-not (Test-Path -LiteralPath $desktopExe -PathType Leaf)) { throw '官方 Codex Desktop 主程序不存在' }
+$profile = '__DESKTOP_PROFILE__'
+New-Item -ItemType Directory -Force -Path $profile | Out-Null
+$start = New-Object Diagnostics.ProcessStartInfo
+$start.FileName = $desktopExe
+$start.Arguments = '--user-data-dir="' + $profile + '"'
+$start.WorkingDirectory = '__WORKDIR__'
+$start.UseShellExecute = $false
+$start.EnvironmentVariables['CODEX_HOME'] = $codexHome
+$start.EnvironmentVariables['CODEX_INSTALL_DIR'] = $codexBin
+$process = [Diagnostics.Process]::Start($start)
+if (-not $process) { throw 'Codex Desktop 启动失败' }
+'@
+            $desktopScript = $desktopScript.Replace('__CODEX_HOME__', $codexHome.Replace("'", "''"))
+            $desktopScript = $desktopScript.Replace('__CODEX_BIN__', $binDir.Replace("'", "''"))
+            $desktopScript = $desktopScript.Replace('__MODEL__', $model.Replace("'", "''"))
+            $desktopScript = $desktopScript.Replace('__DESKTOP_PROFILE__', $desktopProfile.Replace("'", "''"))
+            $desktopScript = $desktopScript.Replace('__WORKDIR__', $cfg.Workdir.Replace("'", "''"))
+            Set-Content -LiteralPath $desktopPs1 -Value $desktopScript -Encoding UTF8
+
+            $desktopCmd = Join-Path $root ($cfg.BrandName + ' Codex Desktop.cmd')
             $dLines = @(
                 '@echo off',
-                ('set "CODEX_HOME=' + $codexHome + '"'),
-                ('set "CODEX_INSTALL_DIR=' + $binDir + '"'),
-                ('start "" "' + $desktopExe + '"')
+                ('powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "' + $desktopPs1 + '"')
             )
             Set-Content -LiteralPath $desktopCmd -Value ($dLines -join "`r`n") -Encoding Default
             $launchTarget = $desktopCmd
@@ -722,7 +752,7 @@ $workerScript = {
             $lnk.Description = if ($desktopCmd) { ($cfg.BrandName + ' Codex 桌面版（独立配置）') } else { ($cfg.BrandName + ' Codex 终端（独立配置）') }
             $lnk.Save()
             if ($desktopCmd) {
-                $shortcuts += ($cfg.BrandName + ' Codex —— 桌面版（专属副本）')
+                $shortcuts += ($cfg.BrandName + ' Codex —— 官方桌面版（独立配置）')
                 $lnk2 = $wsh.CreateShortcut((Join-Path $desktopDir ($cfg.BrandName + ' Codex 终端.lnk')))
                 $lnk2.TargetPath = $terminalCmd
                 $lnk2.WorkingDirectory = $cfg.Workdir
@@ -740,6 +770,7 @@ $workerScript = {
             $shortcuts += ($cfg.BrandName + ' Codex 后台伴侣 —— 已运行')
         }
         $sync.Summary.LaunchTarget = $terminalCmd
+        $sync.Summary.DesktopTarget = $desktopCmd
         $sync.Summary.Workdir = $cfg.Workdir
         $sync.Summary.Shortcuts = ($shortcuts -join [Environment]::NewLine)
         Log '桌面快捷方式已创建'
@@ -786,6 +817,9 @@ function Start-Worker([string]$Mode) {
         Companion = ($ChkCompanion.IsChecked -eq $true)
         AutoStart = ($ChkStartup.IsChecked -eq $true)
         CompanionSource = $env:FLUXGATE_COMPANION_SOURCE
+        CodexArchive = $env:FLUXGATE_CODEX_ARCHIVE
+        NoticeSource = $env:FLUXGATE_NOTICE_SOURCE
+        ThirdPartyLicensesSource = $env:FLUXGATE_THIRD_PARTY_LICENSES_SOURCE
         BrandName = $BrandName; ProviderId = $ProviderId
         GatewayBaseUrl = $GatewayBaseUrl; SiteBaseUrl = $SiteBaseUrl
         GitHubProxy = $GitHubProxy
@@ -865,6 +899,10 @@ $BtnInstall.Add_Click({
 })
 
 $BtnOpenDir.Add_Click({ if (Test-Path $LauncherRoot) { Start-Process explorer.exe $LauncherRoot } })
+$BtnDesktop.Add_Click({
+    $t = $sync.Summary.DesktopTarget
+    if ($t -and (Test-Path -LiteralPath $t)) { Start-Process -FilePath $t -WorkingDirectory $sync.Summary.Workdir }
+})
 $BtnLaunch.Add_Click({
     $t = $sync.Summary.LaunchTarget
     if ($t -match '^https?://') { Start-Process $t }
@@ -924,6 +962,12 @@ $timer.Add_Tick({
                 if (-not $sync.Summary.DesktopExe) { $sub = $sub + [Environment]::NewLine + '（本次使用终端模式）' }
                 $DoneSub.Text = $sub
                 $DoneShortcuts.Text = [string]$sync.Summary.Shortcuts
+                if ($sync.Summary.DesktopTarget) {
+                    $BtnDesktop.Visibility = 'Visible'
+                    try { Start-Process -FilePath $sync.Summary.DesktopTarget -WorkingDirectory $sync.Summary.Workdir } catch {}
+                } else {
+                    $BtnDesktop.Visibility = 'Collapsed'
+                }
                 try {
                     Start-Process -FilePath $sync.Summary.LaunchTarget -WorkingDirectory $sync.Summary.Workdir
                 } catch {

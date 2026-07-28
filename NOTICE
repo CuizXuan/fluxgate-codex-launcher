@@ -36,6 +36,13 @@ frontend bundles, and Electron desktop installers distributed to users.
 
 ==== Apache-2.0 Notices ====
 
+OpenAI Codex
+Copyright 2025 OpenAI
+
+OpenAI Codex includes code derived from Ratatui, licensed under the MIT
+license. Copyright (c) 2016-2022 Florian Dehau. Copyright (c) 2023-2025 The
+Ratatui Developers.
+
 AWS SDK for Go
 Copyright 2015 Amazon.com, Inc. or its affiliates. All Rights Reserved.
 Copyright 2014-2015 Stripe, Inc.
