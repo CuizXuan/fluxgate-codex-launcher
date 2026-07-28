@@ -20,6 +20,14 @@
 - Not Done: Commit, push, v2.1.0 tag, GitHub Release workflow, and published-asset verification.
 - Next: Publish v2.1.0 after the paired APK commit is ready.
 
+## Latest Update - 2026-07-28 13:10
+- Scope: Publish and independently verify the integrated v2.1.0 Launcher.
+- Completed: Pushed commit `59f77e0`, tagged `v2.1.0`, and published all seven assets through the Windows release workflow.
+- Validation: The public release workflow passed; all seven published assets downloaded successfully; the published EXE embedded-resource self-test passed; and the published Bridge/mobile ZIPs contain no Codex executable or `app.asar`.
+- Problems / Blockers: None.
+- Not Done: None for v2.1.0.
+- Next: Monitor first-run installation feedback and keep the native companion contract covered by local and production smoke tests.
+
 ## Latest Update - 2026-07-27 22:55
 - Scope: Repair the v2.0.0 production integration and prepare a validated patch release.
 - Completed: Confirmed the repository is clean at `v2.0.0`.
@@ -53,4 +61,4 @@
 - [x] Embed a no-terminal native companion in the Launcher.
 - [x] Stop reusing or updating the user's global Codex CLI.
 - [x] Validate the native companion against the production Bridge.
-- [ ] Publish and verify the v2.1.0 GitHub Release assets.
+- [x] Publish and verify the v2.1.0 GitHub Release assets.
