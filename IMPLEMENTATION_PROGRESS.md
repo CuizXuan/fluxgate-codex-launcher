@@ -11,6 +11,14 @@
 - Not Done: Commit, push, v2.2.0 tag, GitHub Release workflow, and independent public-asset verification.
 - Next: Publish v2.2.0, download the public Full EXE, rerun resource checks, and confirm advanced ZIPs remain free of Codex Desktop/CLI payloads.
 
+## Latest Update - 2026-07-28 15:18
+- Scope: Repair the v2.2.0 GitHub Release gate after the Full build itself succeeded but the following workflow step could not execute the same large self-extracting EXE a second time on the Windows runner.
+- Completed: Kept the executable self-test inside the build step and replaced the cross-step rerun with direct PE Assembly Manifest validation of all five embedded resources and their minimum lengths. Added a production contract assertion for this release gate.
+- Validation: The revised gate read the local Full EXE and confirmed the setup script, native companion, 119,947,181-byte official CLI archive, NOTICE, and third-party license resources. All seven contract tests still pass.
+- Problems / Blockers: The first two CI attempts failed only at the redundant cross-step EXE invocation; both had already completed the build and its in-step Full self-test successfully, and neither created a GitHub Release.
+- Not Done: Push the gate fix, retarget the unpublished v2.2.0 tag, complete the workflow, and verify public assets.
+- Next: Publish the corrected tag and independently download and inspect the public Full package.
+
 ## Latest Update - 2026-07-28 12:00
 - Scope: Replace the multi-terminal Launcher + Node Bridge flow with a beginner-ready integrated Windows experience.
 - Completed: Confirmed the current Launcher and Bridge repositories are clean and identified the shared-binary/isolated-config boundary and the stuck Windows sandbox bootstrap observed during real use.

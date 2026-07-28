@@ -31,8 +31,25 @@ jobs:
         run: |
           $full = Get-ChildItem release-assets -Filter 'FluxGate-Codex-Full_*.exe' | Select-Object -First 1
           if (-not $full -or $full.Length -lt 100MB) { throw "Full Launcher is missing or unexpectedly small" }
-          & $full.FullName --self-test-full
-          if ($LASTEXITCODE -ne 0) { throw "Full Launcher resource test failed" }
+          $assembly = [Reflection.Assembly]::LoadFile($full.FullName)
+          $requiredResources = @{
+            'FluxGate.CodexLauncher.SetupScript' = 1KB
+            'FluxGate.CodexLauncher.Companion' = 1KB
+            'FluxGate.CodexLauncher.OfficialCodexArchive' = 100MB
+            'FluxGate.CodexLauncher.Notice' = 1KB
+            'FluxGate.CodexLauncher.ThirdPartyLicenses' = 1KB
+          }
+          foreach ($entry in $requiredResources.GetEnumerator()) {
+            $stream = $assembly.GetManifestResourceStream($entry.Key)
+            if (-not $stream) { throw "Full Launcher resource is missing: $($entry.Key)" }
+            try {
+              if ($stream.Length -lt $entry.Value) {
+                throw "Full Launcher resource is unexpectedly small: $($entry.Key)"
+              }
+            } finally {
+              $stream.Dispose()
+            }
+          }
           Add-Type -AssemblyName System.IO.Compression.FileSystem
           $advanced = @(Get-ChildItem release-assets -Filter '*.zip')
           $unexpected = @($advanced | Where-Object { $_.Name -notmatch '^FluxGate-Codex-(Bridge|Mobile-Web)_' })

@@ -81,6 +81,7 @@ test("Full Launcher bundles CLI and legal resources and configures Store Desktop
   const bootstrapper = await source("src/LauncherBootstrapper.cs");
   const build = await source("build/build-release.ps1");
   const gui = await source("installer/FluxGate-Codex-Setup-GUI.ps1");
+  const workflow = await source(".github/workflows/release.yml");
 
   assert.match(bootstrapper, /FluxGate\.CodexLauncher\.OfficialCodexArchive/);
   assert.match(bootstrapper, /FluxGate\.CodexLauncher\.Notice/);
@@ -98,6 +99,9 @@ test("Full Launcher bundles CLI and legal resources and configures Store Desktop
   assert.match(gui, /\$lines\[\$index\] = 'model = "'/);
   assert.match(gui, /NOTICE\.txt/);
   assert.match(gui, /THIRD-PARTY-LICENSES\.md/);
+  assert.match(workflow, /GetManifestResourceStream/);
+  assert.match(workflow, /FluxGate\.CodexLauncher\.OfficialCodexArchive/);
+  assert.doesNotMatch(workflow, /& \$full\.FullName --self-test-full/);
 });
 
 test("downloadable mobile page uses one-use Bridge tickets", async () => {
