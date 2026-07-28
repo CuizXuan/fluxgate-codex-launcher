@@ -28,6 +28,14 @@
 - Not Done: None for v2.1.0.
 - Next: Monitor first-run installation feedback and keep the native companion contract covered by local and production smoke tests.
 
+## Latest Update - 2026-07-28 14:15
+- Scope: Repair the v2.1.0 first-run CLI failure and make the desktop terminal the primary experience.
+- Completed: Replaced the broad Windows ZIP match with the exact official Codex main asset name, preserved all bundled helper executables, added SHA-256 and post-install `codex-cli` validation, automatically repairs incomplete isolated installs, opens the terminal after GUI/CLI installation, and creates one obvious `FluxGateAI Codex` desktop shortcut. The user's existing global Codex remains untouched.
+- Validation: The affected local install was repaired with official Codex CLI 0.145.0; `codex doctor` reported 17 OK, 0 warnings, and 0 failures; a real production `gpt-5.4-mini` CLI call returned `CLI_OK`; and the installed tray companion completed a production phone-ticket/device/real-Codex/output/done loop returning `REMOTE_CLI_OK`. PowerShell parsing, six contract tests, companion integration, and the v2.1.1 seven-asset release build passed.
+- Problems / Blockers: v2.1.0 can install the wrong executable from the official multi-asset Windows release and does not open the CLI terminal automatically.
+- Not Done: Commit, push, v2.1.1 tag, GitHub Release workflow, and published-asset verification.
+- Next: Publish v2.1.1 immediately and direct v2.1.0 users to rerun the patch installer for automatic repair.
+
 ## Latest Update - 2026-07-27 22:55
 - Scope: Repair the v2.0.0 production integration and prepare a validated patch release.
 - Completed: Confirmed the repository is clean at `v2.0.0`.
@@ -62,3 +70,4 @@
 - [x] Stop reusing or updating the user's global Codex CLI.
 - [x] Validate the native companion against the production Bridge.
 - [x] Publish and verify the v2.1.0 GitHub Release assets.
+- [ ] Publish and verify the v2.1.1 CLI repair release.

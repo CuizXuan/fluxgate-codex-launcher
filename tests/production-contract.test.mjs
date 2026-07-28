@@ -53,6 +53,28 @@ test("installers use a dedicated Codex binary instead of the global CLI", async 
   assert.doesNotMatch(cli, /npm install -g|Get-Command codex/);
   assert.match(gui, /sandbox = "unelevated"/);
   assert.match(cli, /sandbox = `"unelevated`"/);
+  assert.match(gui, /\$assetName = 'codex-' \+ \$arch \+ '-msvc\.exe\.zip'/);
+  assert.match(cli, /\$assetName = 'codex-' \+ \$arch \+ '-msvc\.exe\.zip'/);
+  assert.match(gui, /Where-Object \{ \$_.name -eq \$assetName \}/);
+  assert.match(cli, /Where-Object \{ \$_.name -eq \$assetName \}/);
+  assert.doesNotMatch(gui, /Where-Object \{ \$_.name -match \$arch/);
+  assert.doesNotMatch(cli, /Where-Object \{ \$_.name -match \$arch/);
+  assert.match(gui, /Move-Item[^\n]+\$mainName[^\n]+\$localCli/);
+  assert.match(cli, /Move-Item[^\n]+\$mainName[^\n]+'codex\.exe'/);
+  assert.match(gui, /installedVersion -notmatch '\^codex-cli\\s'/);
+  assert.match(cli, /installedVersion -notmatch '\^codex-cli\\s'/);
+});
+
+test("GUI installation opens the local Codex terminal", async () => {
+  const gui = await source("installer/FluxGate-Codex-Setup-GUI.ps1");
+  const cli = await source("installer/FluxGate-Codex-Setup.ps1");
+
+  assert.match(gui, /Content="打开 Codex 终端"/);
+  assert.match(gui, /\$sync\.Summary\.LaunchTarget = \$terminalCmd/);
+  assert.match(gui, /Start-Process -FilePath \$sync\.Summary\.LaunchTarget -WorkingDirectory \$sync\.Summary\.Workdir/);
+  assert.doesNotMatch(gui, /Summary\.LaunchTarget = \$cfg\.SiteBaseUrl/);
+  assert.match(cli, /CreateShortcut\(\(Join-Path \$desktopDir \(\$BrandName \+ ' Codex\.lnk'\)\)\)/);
+  assert.match(cli, /Start-Process -FilePath \$launcherCmd -WorkingDirectory/);
 });
 
 test("downloadable mobile page uses one-use Bridge tickets", async () => {

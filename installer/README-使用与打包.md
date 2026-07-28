@@ -34,7 +34,7 @@ GUI 中的 Codex Desktop 复用选项默认关闭。用户主动启用时，只�
 在仓库根目录运行：
 
 ```powershell
-.\build\build-release.ps1 -Version 2.1.0
+.\build\build-release.ps1 -Version 2.1.1
 ```
 
 生成的 EXE 嵌入 `FluxGate-Codex-Setup-GUI.ps1` 和本仓库编译的原生伴侣，不嵌入任何 OpenAI 文件。

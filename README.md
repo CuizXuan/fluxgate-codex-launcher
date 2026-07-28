@@ -6,7 +6,7 @@ FluxGate Codex Launcher is a community-maintained Windows installer and remote B
 
 1. Download and run `FluxGate-Codex-Launcher_<version>.exe`.
 2. Sign in with a FluxGateAI account and choose the project folder.
-3. Installation starts the native Bridge companion in the Windows tray and enables startup by default.
+3. Installation opens a ready-to-use Codex CLI terminal, starts the native Bridge companion in the Windows tray, and enables companion startup by default.
 4. Open the FluxAI Android app and tap `远程`; the saved account credential is exchanged for one-use Bridge tickets automatically.
 
 No Node.js, Bridge ZIP, terminal window, browser login, or second desktop credential is required in this flow.
@@ -39,7 +39,7 @@ No release asset contains Codex Desktop, Codex CLI, `app.asar`, or any other Ope
 Requirements: Windows PowerShell 5.1, the inbox .NET Framework C# compiler, and Node.js.
 
 ```powershell
-.\build\build-release.ps1 -Version 2.1.0
+.\build\build-release.ps1 -Version 2.1.1
 ```
 
 The build validates PowerShell and Bridge syntax, compiles and integration-tests the native companion, embeds it with the GUI installer, runs resource self-tests, and creates the advanced Bridge/mobile ZIP assets. The EXE contains FluxGateAI installer/companion code only; it is not an archive of Codex itself.

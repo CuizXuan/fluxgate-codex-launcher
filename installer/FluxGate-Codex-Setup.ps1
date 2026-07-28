@@ -1,5 +1,5 @@
 ﻿# ============================================================================
-#  FluxGateAI · Codex 一键安装器 (Windows / 命令行版)  v2.1.0
+#  FluxGateAI · Codex 一键安装器 (Windows / 命令行版)  v2.1.1
 # ----------------------------------------------------------------------------
 #  功能：
 #    1. 在专属目录安装官方 OpenAI Codex CLI 独立二进制
@@ -54,7 +54,7 @@ function Show-Banner {
     Write-Host '  ============================================================' -ForegroundColor Magenta
     Write-Host ('    ' + $BrandName.ToUpper() + '  x  CODEX') -ForegroundColor Magenta
     Write-Host '  ============================================================' -ForegroundColor Magenta
-    Write-Host ("  $BrandName Codex 一键安装器 v2.1.0") -ForegroundColor White
+    Write-Host ("  $BrandName Codex 一键安装器 v2.1.1") -ForegroundColor White
     Write-Host ("  网关: $GatewayBaseUrl") -ForegroundColor DarkGray
     Write-Host '  ------------------------------------------------------------'
 }
@@ -66,32 +66,54 @@ $InstallDir = Join-Path $LauncherRoot 'codex-bin'
 
 function Get-CodexCommand {
     $local = Join-Path $InstallDir 'codex.exe'
-    if (Test-Path -LiteralPath $local) { return $local }
+    if (Test-Path -LiteralPath $local) {
+        try {
+            $version = (& $local --version 2>&1 | Out-String).Trim()
+            if ($LASTEXITCODE -eq 0 -and $version -match '^codex-cli\s') { return $local }
+        } catch {}
+        Write-Warn2 '现有独立 CLI 不完整，将自动修复'
+    }
     return $null
 }
 
 function Install-CodexStandalone {
     Write-Host '  从 GitHub Releases 下载官方独立二进制...' -ForegroundColor DarkGray
     $arch = if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'aarch64-pc-windows' } else { 'x86_64-pc-windows' }
+    $assetName = 'codex-' + $arch + '-msvc.exe.zip'
     $apiUrl = 'https://api.github.com/repos/openai/codex/releases/latest'
     if ($GitHubProxy) { $apiUrl = $GitHubProxy.TrimEnd('/') + '/' + $apiUrl }
     $release = Invoke-RestMethod -Uri $apiUrl -Headers @{ 'User-Agent' = "$BrandName-installer" } -TimeoutSec 60
-    $asset = $release.assets | Where-Object { $_.name -match $arch -and $_.name -match '\.zip$' } | Select-Object -First 1
-    if (-not $asset) { throw "未在最新 Release 中找到 $arch 的 zip 资产。" }
+    $asset = $release.assets | Where-Object { $_.name -eq $assetName } | Select-Object -First 1
+    if (-not $asset) { throw "未在最新 Release 中找到官方 Codex CLI 主资产: $assetName" }
     $dlUrl = $asset.browser_download_url
     if ($GitHubProxy) { $dlUrl = $GitHubProxy.TrimEnd('/') + '/' + $dlUrl }
 
     $tmpZip = Join-Path $env:TEMP ("codex-" + [guid]::NewGuid().ToString('N') + '.zip')
-    Invoke-WebRequest -Uri $dlUrl -OutFile $tmpZip -UseBasicParsing -TimeoutSec 600
     $tmpDir = Join-Path $env:TEMP ("codex-unzip-" + [guid]::NewGuid().ToString('N'))
-    Expand-Archive -LiteralPath $tmpZip -DestinationPath $tmpDir -Force
-    $exe = Get-ChildItem -LiteralPath $tmpDir -Recurse -Filter '*.exe' | Select-Object -First 1
-    if (-not $exe) { throw '压缩包中未找到 codex 可执行文件。' }
+    try {
+        Invoke-WebRequest -Uri $dlUrl -OutFile $tmpZip -UseBasicParsing -TimeoutSec 600
+        $expectedDigest = [string]$asset.digest
+        if ($expectedDigest -match '^sha256:([0-9a-fA-F]{64})$') {
+            $actualDigest = (Get-FileHash -Algorithm SHA256 -LiteralPath $tmpZip).Hash
+            if ($actualDigest -ne $Matches[1]) { throw '官方 Codex CLI 下载文件校验失败' }
+        }
+        Expand-Archive -LiteralPath $tmpZip -DestinationPath $tmpDir -Force
+        $mainName = 'codex-' + $arch + '-msvc.exe'
+        $mainExe = Get-ChildItem -LiteralPath $tmpDir -Recurse -File -Filter $mainName | Select-Object -First 1
+        if (-not $mainExe) { throw "官方压缩包中未找到主程序: $mainName" }
 
-    New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
-    Copy-Item -LiteralPath $exe.FullName -Destination (Join-Path $InstallDir 'codex.exe') -Force
-    Remove-Item -LiteralPath $tmpZip -Force -ErrorAction SilentlyContinue
-    Remove-Item -LiteralPath $tmpDir -Recurse -Force -ErrorAction SilentlyContinue
+        New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
+        Get-ChildItem -LiteralPath $InstallDir -Force | Remove-Item -Recurse -Force
+        Get-ChildItem -LiteralPath $mainExe.Directory.FullName -Force | Copy-Item -Destination $InstallDir -Recurse -Force
+        Move-Item -LiteralPath (Join-Path $InstallDir $mainName) -Destination (Join-Path $InstallDir 'codex.exe') -Force
+        $installedVersion = (& (Join-Path $InstallDir 'codex.exe') --version 2>&1 | Out-String).Trim()
+        if ($LASTEXITCODE -ne 0 -or $installedVersion -notmatch '^codex-cli\s') {
+            throw '官方 Codex CLI 安装后启动验证失败'
+        }
+    } finally {
+        Remove-Item -LiteralPath $tmpZip -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath $tmpDir -Recurse -Force -ErrorAction SilentlyContinue
+    }
 
     # 隔离设计：不修改全局 PATH，启动器 cmd 内部临时注入
     if ($env:Path -notlike "*$InstallDir*") { $env:Path = $InstallDir + ';' + $env:Path }
@@ -202,11 +224,13 @@ function New-FluxLauncher([string]$CliPath) {
             Write-Warn2 '未找到桌面目录，跳过快捷方式创建（可直接运行上面的启动器 cmd）'
         } else {
             $wsh = New-Object -ComObject WScript.Shell
-            $lnk = $wsh.CreateShortcut((Join-Path $desktopDir ($BrandName + ' Codex 终端.lnk')))
+            $lnk = $wsh.CreateShortcut((Join-Path $desktopDir ($BrandName + ' Codex.lnk')))
             $lnk.TargetPath = $terminalCmd
             $lnk.WorkingDirectory = [Environment]::GetFolderPath('UserProfile')
             $lnk.Description = ($BrandName + ' Codex 终端（独立配置）')
             $lnk.Save()
+            $legacyShortcut = Join-Path $desktopDir ($BrandName + ' Codex 终端.lnk')
+            if (Test-Path -LiteralPath $legacyShortcut) { Remove-Item -LiteralPath $legacyShortcut -Force }
             Write-Ok '桌面快捷方式已创建'
         }
     } catch { Write-Warn2 ('创建快捷方式失败: ' + $_.Exception.Message) }
@@ -219,6 +243,7 @@ function New-FluxLauncher([string]$CliPath) {
         ('echo Removing ' + $BrandName + ' Codex Launcher (your official Codex is untouched)...')
     )
     if ($desktopDir -and (Test-Path -LiteralPath $desktopDir)) {
+        $uLines += ('del "' + (Join-Path $desktopDir ($BrandName + ' Codex.lnk')) + '" 2>nul')
         $uLines += ('del "' + (Join-Path $desktopDir ($BrandName + ' Codex 终端.lnk')) + '" 2>nul')
     }
     $uLines += ('start "" cmd /s /c "timeout /t 2 >nul & rd /s /q "' + $LauncherRoot + '""')
@@ -332,7 +357,7 @@ Write-Host '  ------------------------------------------------------------'
 Write-Host ("  √ $BrandName Codex 安装完成！") -ForegroundColor Green
 Write-Host ''
 Write-Host '  使用方法：' -ForegroundColor White
-Write-Host ("    双击桌面的「$BrandName Codex 终端」快捷方式即可使用")
+Write-Host ("    双击桌面的「$BrandName Codex」快捷方式即可使用")
 Write-Host '    （独立配置，不影响你原有的 Codex / Codex Desktop）'
 Write-Host ''
 Write-Host ("  安装目录: " + $LauncherRoot) -ForegroundColor DarkGray
@@ -340,3 +365,8 @@ Write-Host ("  启动器:   " + $launcherCmd) -ForegroundColor DarkGray
 Write-Host ("  配置文件: " + $configPath) -ForegroundColor DarkGray
 Write-Host ("  控制台:   " + $ConsoleUrl) -ForegroundColor DarkGray
 Write-Host '  ------------------------------------------------------------'
+try {
+    Start-Process -FilePath $launcherCmd -WorkingDirectory ([Environment]::GetFolderPath('UserProfile'))
+} catch {
+    Write-Warn2 '终端未能自动打开，请双击桌面的 Codex 快捷方式'
+}
