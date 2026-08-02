@@ -77,7 +77,7 @@ test("GUI installation opens the local Codex terminal", async () => {
   assert.match(cli, /Start-Process -FilePath \$launcherCmd -WorkingDirectory/);
 });
 
-test("Full Launcher bundles CLI and legal resources and configures Store Desktop", async () => {
+test("Full Launcher keeps Store support and Portable Desktop is an explicit local build", async () => {
   const bootstrapper = await source("src/LauncherBootstrapper.cs");
   const build = await source("build/build-release.ps1");
   const gui = await source("installer/FluxGate-Codex-Setup-GUI.ps1");
@@ -88,12 +88,25 @@ test("Full Launcher bundles CLI and legal resources and configures Store Desktop
   assert.match(bootstrapper, /FluxGate\.CodexLauncher\.ThirdPartyLicenses/);
   assert.match(bootstrapper, /--self-test-full/);
   assert.match(bootstrapper, /FLUXGATE_CODEX_ARCHIVE/);
+  assert.match(bootstrapper, /FLUXGATE_DESKTOP_ARCHIVE/);
+  assert.match(bootstrapper, /FLUXGATE_PORTABLE_DESKTOP_V1/);
+  assert.match(bootstrapper, /--self-test-portable/);
   assert.match(build, /codex-x86_64-pc-windows-msvc\.exe\.zip/);
   assert.match(build, /codex-command-runner\.exe/);
   assert.match(build, /codex-windows-sandbox-setup\.exe/);
   assert.match(build, /Official Codex CLI release does not provide a SHA-256 digest/);
+  assert.match(build, /gh\.exe/);
+  assert.match(build, /releaseHeaders\.Authorization = 'Bearer ' \+ \$env:GH_TOKEN/);
+  assert.match(workflow, /GH_TOKEN: \$\{\{ github\.token \}\}/);
   assert.match(gui, /Get-AppxPackage -Name 'OpenAI\.Codex'/);
   assert.match(gui, /'9PLM9XGG6VKS'/);
+  assert.match(gui, /DesktopPortableMode/);
+  assert.match(gui, /DesktopOfficialMode/);
+  assert.match(gui, /DesktopNoneMode/);
+  assert.match(gui, /Join-Path \$root 'desktop-app'/);
+  assert.match(gui, /Join-Path \$root 'portable-desktop\.json'/);
+  assert.match(gui, /portableManifest\.user_data_included -ne \$false/);
+  assert.match(gui, /便携版固定为打包时版本，不注册 Microsoft Store，也不自动更新/);
   assert.match(gui, /--user-data-dir=/);
   assert.match(gui, /EnvironmentVariables\['CODEX_HOME'\]/);
   assert.match(gui, /\$lines\[\$index\] = 'model = "'/);
@@ -102,6 +115,16 @@ test("Full Launcher bundles CLI and legal resources and configures Store Desktop
   assert.match(workflow, /GetManifestResourceStream/);
   assert.match(workflow, /FluxGate\.CodexLauncher\.OfficialCodexArchive/);
   assert.doesNotMatch(workflow, /& \$full\.FullName --self-test-full/);
+  assert.match(build, /\[switch\]\$BuildPortableDesktop/);
+  assert.match(build, /\[string\]\$PortableDesktopDir/);
+  assert.match(build, /FluxGate-Codex-Desktop-Portable_\$Version\.exe/);
+  assert.match(build, /portable-desktop-manifest\.json/);
+  assert.match(build, /user_data_included = \$false/);
+  assert.match(build, /auth\\\.json\|cookies\?/);
+  assert.match(build, /Portable Desktop EXE exceeds the GitHub Releases 2 GB per-file limit/);
+  assert.match(build, /Start-Process -FilePath \$exePath -ArgumentList '--self-test' -Wait -PassThru/);
+  assert.match(build, /Start-Process -FilePath \$fullExePath -ArgumentList '--self-test-full' -Wait -PassThru/);
+  assert.match(build, /Start-Process -FilePath \$portableExePath -ArgumentList '--self-test-portable' -Wait -PassThru/);
 });
 
 test("downloadable mobile page uses one-use Bridge tickets", async () => {

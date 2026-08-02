@@ -1,7 +1,15 @@
 # Implementation Progress
 
 ## Current Focus
-- v2.2.0 Full Launcher is published and independently verified; monitor normal first-run feedback.
+- Publish the validated v2.3.0 Portable Desktop implementation and paired offline artifact.
+
+## Latest Update - 2026-08-02 22:33
+- Scope: Add a locally sourced, version-pinned Codex Desktop payload for users who choose the FluxGateAI portable copy instead of Microsoft Store installation.
+- Completed: Added the opt-in local Desktop archive builder, SHA-256 overlay footer, synchronized bootstrapper extraction/self-test, Portable/official/terminal GUI modes, transactional `desktop-app` replacement, installed source-version manifest, GitHub token-aware CLI release lookup, and detailed repository/release documentation. The Desktop payload remains outside git and GitHub Actions.
+- Validation: Seven production-contract tests, PowerShell parsing, WPF XAML parsing, native companion integration, online/Full/Portable self-tests, manifest size/hash checks, archive entry/user-data inspection, and a real launch from an extracted ordinary `H:\Temp` directory passed. The final Portable EXE is 855,639,098 bytes with SHA-256 `1cac3c055380a98fe12df672161bd2f1b636a151a644af7aa7d85cd8746677cd`; it contains Desktop source version `26.727.6591.0`, and the paired manifest declares `user_data_included: false`.
+- Problems / Blockers: A truly clean Windows machine was not available, but the copied Desktop launched outside WindowsApps with nine portable `ChatGPT`/`codex` processes and an isolated 359-file profile. No implementation blocker remains.
+- Not Done: Commit, push, GitHub release/tag, upload of the 816 MiB Portable asset, and independent download verification.
+- Next: Commit and push the source branch, publish v2.3.0, upload the locally built Portable EXE plus JSON manifest, then verify the public assets.
 
 ## Latest Update - 2026-07-28 15:30
 - Scope: Complete the corrected v2.2.0 release and independently verify every public asset.

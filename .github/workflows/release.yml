@@ -22,6 +22,8 @@ jobs:
 
       - name: Build and validate deliverables
         shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           $version = "${{ github.ref_name }}".TrimStart('v')
           .\build\build-release.ps1 -Version $version -BuildFull
@@ -75,4 +77,4 @@ jobs:
         run: |
           gh release create "${{ github.ref_name }}" release-assets/* `
             --title "FluxGate Codex Launcher ${{ github.ref_name }}" `
-            --notes "Use FluxGate-Codex-Full for the beginner-ready x64 package with the official Apache-2.0 Codex CLI archive, graphical installer, and native tray companion embedded. It installs or detects official Codex Desktop through Microsoft Store product 9PLM9XGG6VKS and launches it with an isolated FluxGateAI profile; the Store desktop payload itself is not repackaged. The smaller Launcher remains available for online CLI installation, while Bridge and mobile-web ZIPs are advanced assets."
+            --notes "FluxGate-Codex-Full embeds the official Apache-2.0 Codex CLI archive, graphical installer, and native tray companion; it does not contain Codex Desktop. It detects or installs the Microsoft Store Desktop and launches it with an isolated FluxGateAI profile. An optional FluxGate-Codex-Desktop-Portable asset may be built and uploaded separately from an explicitly supplied local Desktop app directory. That edition is a fixed-version portable snapshot, does not register with Microsoft Store, does not auto-update, and never includes the builder's login state or user data. The smaller Launcher remains available for online CLI installation, while Bridge and mobile-web ZIPs are advanced assets."

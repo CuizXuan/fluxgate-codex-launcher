@@ -1,11 +1,12 @@
 ﻿# ============================================================================
-#  FluxGateAI · Codex 一键安装器 (Windows / 图形界面版)  v2.2.0
+#  FluxGateAI · Codex 一键安装器 (Windows / 图形界面版)  v2.3.0
 # ----------------------------------------------------------------------------
 #  隔离 Launcher 架构：
 #    %APPDATA%\FluxGateAICodexLauncher\
 #      codex-home\   独立 CODEX_HOME（config.toml / auth.json，只写这里）
 #      codex-bin\    独立 CLI 二进制（不改全局 PATH）
-#      desktop-data\ 官方 Codex Desktop 的独立用户数据（Store 包本体不复制）
+#      desktop-app\  可选的内置 Portable Desktop（不含任何用户数据）
+#      desktop-data\ Codex Desktop 的独立用户数据
 #      logs\         安装日志
 #    ！！本安装器绝不写入 ~/.codex，不影响你现有的 Codex / Codex Desktop。
 #    首次运行会检测 v1 版对 ~/.codex 的修改并自动还原备份。
@@ -22,7 +23,7 @@ $GatewayBaseUrl = 'https://api.fluxapi.cloud/v1'
 $SiteBaseUrl    = 'https://api.fluxapi.cloud'         # 控制台 / desktop API 根地址
 $DefaultModel   = 'gpt-5.4-mini'
 $GitHubProxy    = ''                                  # 大陆加速可填 'https://gh-proxy.com/'
-$AppVersion     = 'v2.2.0'
+$AppVersion     = 'v2.3.0'
 $LauncherDirName = 'FluxGateAICodexLauncher'          # %APPDATA% 下的专属目录名
 # ==========================================================================
 
@@ -183,7 +184,8 @@ $xamlText = @'
       <Grid Grid.Row="1" Margin="22,4,22,0">
 
         <!-- 表单页 -->
-        <StackPanel x:Name="PanelForm">
+        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel x:Name="PanelForm" Margin="0,0,6,0">
           <Border Background="{StaticResource CardBrush}" BorderBrush="{StaticResource BorderBrush2}" BorderThickness="1" CornerRadius="10" Padding="18">
             <StackPanel>
               <Grid>
@@ -240,9 +242,17 @@ $xamlText = @'
               <CheckBox x:Name="ChkStartup" IsChecked="True" Margin="0,8,0,0" FontSize="12">
                 <TextBlock Text="开机后自动连接手机端" Foreground="{StaticResource MutedBrush}" FontSize="12"/>
               </CheckBox>
-              <CheckBox x:Name="ChkDesktop" IsChecked="True" Margin="0,8,0,0" FontSize="12">
-                <TextBlock Text="安装并启动官方 Codex Desktop（通过 Microsoft Store，使用独立 FluxGateAI 配置）" Foreground="{StaticResource MutedBrush}" FontSize="12" TextWrapping="Wrap"/>
-              </CheckBox>
+              <TextBlock Text="Codex Desktop" FontSize="12" Foreground="{StaticResource MutedBrush}" Margin="0,10,0,4"/>
+              <RadioButton x:Name="DesktopPortableMode" GroupName="DesktopMode" IsChecked="True" FontSize="12">
+                <TextBlock Text="使用安装包内置便携版（固定版本，不依赖商店更新）" Foreground="{StaticResource MutedBrush}" FontSize="12" TextWrapping="Wrap"/>
+              </RadioButton>
+              <RadioButton x:Name="DesktopOfficialMode" GroupName="DesktopMode" Margin="0,6,0,0" FontSize="12">
+                <TextBlock Text="使用本机官方版（未安装时打开 Microsoft Store）" Foreground="{StaticResource MutedBrush}" FontSize="12" TextWrapping="Wrap"/>
+              </RadioButton>
+              <RadioButton x:Name="DesktopNoneMode" GroupName="DesktopMode" Margin="0,6,0,0" FontSize="12">
+                <TextBlock Text="仅安装 Codex 终端" Foreground="{StaticResource MutedBrush}" FontSize="12"/>
+              </RadioButton>
+              <TextBlock x:Name="DesktopModeHint" FontSize="11" Foreground="{StaticResource MutedBrush}" Margin="22,5,0,0" TextWrapping="Wrap"/>
               <CheckBox x:Name="ChkSmoke" IsChecked="True" Margin="0,8,0,0" FontSize="12">
                 <TextBlock Text="安装完成后运行连通性测试（消耗少量 token）" Foreground="{StaticResource MutedBrush}" FontSize="12"/>
               </CheckBox>
@@ -254,6 +264,7 @@ $xamlText = @'
           <Button x:Name="BtnInstall" Style="{StaticResource PrimaryBtn}" Content="开 始 安 装" Margin="0,16,0,0" Height="44"/>
           <TextBlock x:Name="FormStatus" Text="" FontSize="12" Foreground="#F85149" Margin="0,8,0,0" TextWrapping="Wrap"/>
         </StackPanel>
+        </ScrollViewer>
 
         <!-- 进度页 -->
         <StackPanel x:Name="PanelProgress" Visibility="Collapsed">
@@ -314,7 +325,7 @@ $window = [Windows.Markup.XamlReader]::Parse($xamlText)
 foreach ($name in @('TitleBar','BtnMin','BtnClose','PanelForm','PanelProgress','PanelDone',
         'ModeAccount','ModeApiKey','AccountFields','KeyFields','UserBox','PassBox',
         'KeyBox','KeyBoxPlain','BtnEye','BtnGetKey','ModelBox','ModelHint','BtnValidate',
-        'WorkdirBox','BtnBrowseWorkdir','ChkCompanion','ChkStartup','ChkDesktop','ChkSmoke','BtnInstall','FormStatus','StageText','ProgFill','PctText',
+        'WorkdirBox','BtnBrowseWorkdir','ChkCompanion','ChkStartup','DesktopPortableMode','DesktopOfficialMode','DesktopNoneMode','DesktopModeHint','ChkSmoke','BtnInstall','FormStatus','StageText','ProgFill','PctText',
         'LogBox','LogScroll','DoneSub','DoneShortcuts','BtnDesktop','BtnLaunch','BtnOpenDir','BtnFinish')) {
     Set-Variable -Name $name -Value $window.FindName($name)
 }
@@ -322,6 +333,16 @@ $ModelBox.Items.Add($DefaultModel) | Out-Null
 $ModelBox.SelectedIndex = 0
 $WorkdirBox.Text = [Environment]::GetFolderPath('MyDocuments')
 if ([string]::IsNullOrWhiteSpace($WorkdirBox.Text)) { $WorkdirBox.Text = [Environment]::GetFolderPath('UserProfile') }
+$portableDesktopArchive = [string]$env:FLUXGATE_DESKTOP_ARCHIVE
+if (-not [string]::IsNullOrWhiteSpace($portableDesktopArchive) -and (Test-Path -LiteralPath $portableDesktopArchive -PathType Leaf)) {
+    $DesktopPortableMode.IsChecked = $true
+    $DesktopModeHint.Text = '安装包已包含经过校验的本地移植副本；不会复制打包电脑的登录态。'
+} else {
+    $DesktopPortableMode.IsEnabled = $false
+    $DesktopPortableMode.IsChecked = $false
+    $DesktopOfficialMode.IsChecked = $true
+    $DesktopModeHint.Text = '当前安装包不含便携桌面版，将检测本机官方安装。'
+}
 
 # ---------------------------------------------------------------------------
 # 共享状态 + 后台工作线程
@@ -507,12 +528,71 @@ $workerScript = {
         } catch {}
         $sync.Summary.CliPath = $cliPath
 
-        # 3. 官方 Codex Desktop 保持 Microsoft Store 包身份；Launcher 只负责安装检测和隔离启动。
+        # 3. Codex Desktop 来源由用户选择：安装包内置便携版、本机官方版或仅终端。
         $desktopExe = $null
-        if ($cfg.BundleDesktop) {
+        $desktopKind = 'none'
+        if ($cfg.DesktopMode -eq 'portable') {
+            Stage '安装内置 Codex Desktop 便携版' 30
+            if ([string]::IsNullOrWhiteSpace($cfg.PortableDesktopArchive) -or
+                -not (Test-Path -LiteralPath $cfg.PortableDesktopArchive -PathType Leaf)) {
+                throw '当前安装包不含 Codex Desktop 便携载荷，请改用本机官方版或仅终端模式'
+            }
+            $desktopInstallDir = Join-Path $root 'desktop-app'
+            $desktopExtractDir = Join-Path $env:TEMP ('fluxgate-desktop-' + [guid]::NewGuid().ToString('N'))
+            $desktopBackupDir = Join-Path $root 'desktop-app.previous'
+            try {
+                Expand-Archive -LiteralPath $cfg.PortableDesktopArchive -DestinationPath $desktopExtractDir -Force
+                $extractedDesktop = Join-Path $desktopExtractDir 'desktop-app'
+                foreach ($requiredRelativePath in @('ChatGPT.exe', 'resources\app.asar', 'resources\codex.exe')) {
+                    if (-not (Test-Path -LiteralPath (Join-Path $extractedDesktop $requiredRelativePath) -PathType Leaf)) {
+                        throw ('内置 Codex Desktop 缺少文件: ' + $requiredRelativePath)
+                    }
+                }
+                $portableManifestSource = Join-Path $desktopExtractDir 'portable-desktop-manifest.json'
+                if (-not (Test-Path -LiteralPath $portableManifestSource -PathType Leaf)) {
+                    throw '内置 Codex Desktop 缺少版本清单'
+                }
+                $portableManifest = Get-Content -LiteralPath $portableManifestSource -Raw -Encoding UTF8 | ConvertFrom-Json
+                if ($portableManifest.user_data_included -ne $false) {
+                    throw '内置 Codex Desktop 版本清单未声明排除用户数据'
+                }
+                Get-Process -Name 'ChatGPT','Codex' -ErrorAction SilentlyContinue | ForEach-Object {
+                    try {
+                        if ($_.Path -and $_.Path.StartsWith($desktopInstallDir, [StringComparison]::OrdinalIgnoreCase)) {
+                            Stop-Process -Id $_.Id -Force -ErrorAction Stop
+                        }
+                    } catch {}
+                }
+                if (Test-Path -LiteralPath $desktopBackupDir) {
+                    Remove-Item -LiteralPath $desktopBackupDir -Recurse -Force
+                }
+                if (Test-Path -LiteralPath $desktopInstallDir) {
+                    Move-Item -LiteralPath $desktopInstallDir -Destination $desktopBackupDir
+                }
+                try {
+                    Move-Item -LiteralPath $extractedDesktop -Destination $desktopInstallDir
+                } catch {
+                    if ((-not (Test-Path -LiteralPath $desktopInstallDir)) -and (Test-Path -LiteralPath $desktopBackupDir)) {
+                        Move-Item -LiteralPath $desktopBackupDir -Destination $desktopInstallDir
+                    }
+                    throw
+                }
+                if (Test-Path -LiteralPath $desktopBackupDir) {
+                    Remove-Item -LiteralPath $desktopBackupDir -Recurse -Force
+                }
+                Copy-Item -LiteralPath $portableManifestSource -Destination (Join-Path $root 'portable-desktop.json') -Force
+            } finally {
+                Remove-Item -LiteralPath $desktopExtractDir -Recurse -Force -ErrorAction SilentlyContinue
+            }
+            $desktopExe = Join-Path $desktopInstallDir 'ChatGPT.exe'
+            $desktopKind = 'portable'
+            Log ('内置 Codex Desktop 已安装: ' + $desktopExe)
+            Log ('便携桌面版来源版本: ' + $portableManifest.source_version)
+            Log '便携版固定为打包时版本，不注册 Microsoft Store，也不自动更新'
+        } elseif ($cfg.DesktopMode -eq 'official') {
             Stage '检查官方 Codex Desktop' 30
             $desktopPackage = Get-AppxPackage -Name 'OpenAI.Codex' -ErrorAction SilentlyContinue |
-                              Sort-Object Version -Descending | Select-Object -First 1
+                               Sort-Object Version -Descending | Select-Object -First 1
             if (-not $desktopPackage) {
                 $winget = Get-Command 'winget.exe' -ErrorAction SilentlyContinue | Select-Object -First 1
                 if ($winget) {
@@ -538,11 +618,13 @@ $workerScript = {
                     $desktopExe = $null
                     Log '官方 Codex Desktop 包存在，但未找到主程序'
                 } else {
+                    $desktopKind = 'official'
                     Log ('官方 Codex Desktop 已就绪: ' + $desktopPackage.Version)
                 }
             }
         }
         $sync.Summary.DesktopExe = $desktopExe
+        $sync.Summary.DesktopKind = $desktopKind
 
         # 4. 账号登录 / Key 解析
         Stage '获取访问凭证' 58
@@ -692,11 +774,17 @@ for ($index = 0; $index -lt $lines.Count; $index++) {
 if (-not $modelUpdated) { $lines = @('model = "' + $requiredModel.Replace('"', '\"') + '"') + $lines }
 Set-Content -LiteralPath $configPath -Value ($lines -join [Environment]::NewLine) -Encoding UTF8
 
-$package = Get-AppxPackage -Name 'OpenAI.Codex' -ErrorAction SilentlyContinue |
-           Sort-Object Version -Descending | Select-Object -First 1
-if (-not $package) { throw '未安装官方 Codex Desktop，请重新运行 Launcher' }
-$desktopExe = Join-Path $package.InstallLocation 'app\ChatGPT.exe'
-if (-not (Test-Path -LiteralPath $desktopExe -PathType Leaf)) { throw '官方 Codex Desktop 主程序不存在' }
+$desktopKind = '__DESKTOP_KIND__'
+if ($desktopKind -eq 'portable') {
+    $desktopExe = '__DESKTOP_EXE__'
+    if (-not (Test-Path -LiteralPath $desktopExe -PathType Leaf)) { throw '内置 Codex Desktop 主程序不存在，请重新运行 Launcher' }
+} else {
+    $package = Get-AppxPackage -Name 'OpenAI.Codex' -ErrorAction SilentlyContinue |
+               Sort-Object Version -Descending | Select-Object -First 1
+    if (-not $package) { throw '未安装官方 Codex Desktop，请重新运行 Launcher' }
+    $desktopExe = Join-Path $package.InstallLocation 'app\ChatGPT.exe'
+    if (-not (Test-Path -LiteralPath $desktopExe -PathType Leaf)) { throw '官方 Codex Desktop 主程序不存在' }
+}
 $profile = '__DESKTOP_PROFILE__'
 New-Item -ItemType Directory -Force -Path $profile | Out-Null
 $start = New-Object Diagnostics.ProcessStartInfo
@@ -714,6 +802,8 @@ if (-not $process) { throw 'Codex Desktop 启动失败' }
             $desktopScript = $desktopScript.Replace('__MODEL__', $model.Replace("'", "''"))
             $desktopScript = $desktopScript.Replace('__DESKTOP_PROFILE__', $desktopProfile.Replace("'", "''"))
             $desktopScript = $desktopScript.Replace('__WORKDIR__', $cfg.Workdir.Replace("'", "''"))
+            $desktopScript = $desktopScript.Replace('__DESKTOP_KIND__', $desktopKind.Replace("'", "''"))
+            $desktopScript = $desktopScript.Replace('__DESKTOP_EXE__', $desktopExe.Replace("'", "''"))
             Set-Content -LiteralPath $desktopPs1 -Value $desktopScript -Encoding UTF8
 
             $desktopCmd = Join-Path $root ($cfg.BrandName + ' Codex Desktop.cmd')
@@ -752,7 +842,11 @@ if (-not $process) { throw 'Codex Desktop 启动失败' }
             $lnk.Description = if ($desktopCmd) { ($cfg.BrandName + ' Codex 桌面版（独立配置）') } else { ($cfg.BrandName + ' Codex 终端（独立配置）') }
             $lnk.Save()
             if ($desktopCmd) {
-                $shortcuts += ($cfg.BrandName + ' Codex —— 官方桌面版（独立配置）')
+                if ($desktopKind -eq 'portable') {
+                    $shortcuts += ($cfg.BrandName + ' Codex —— 内置便携桌面版（固定版本）')
+                } else {
+                    $shortcuts += ($cfg.BrandName + ' Codex —— 本机官方桌面版（独立配置）')
+                }
                 $lnk2 = $wsh.CreateShortcut((Join-Path $desktopDir ($cfg.BrandName + ' Codex 终端.lnk')))
                 $lnk2.TargetPath = $terminalCmd
                 $lnk2.WorkingDirectory = $cfg.Workdir
@@ -805,6 +899,9 @@ $script:rsWorker = $null
 function Start-Worker([string]$Mode) {
     $authMode = 'account'
     if ($ModeApiKey.IsChecked) { $authMode = 'key' }
+    $desktopMode = 'none'
+    if ($DesktopPortableMode.IsChecked) { $desktopMode = 'portable' }
+    elseif ($DesktopOfficialMode.IsChecked) { $desktopMode = 'official' }
     $key = if ($KeyBoxPlain.Visibility -eq 'Visible') { $KeyBoxPlain.Text.Trim() } else { $KeyBox.Password.Trim() }
     $cfg = @{
         Mode = $Mode; AuthMode = $authMode
@@ -812,7 +909,8 @@ function Start-Worker([string]$Mode) {
         ApiKey = $key
         Model = $ModelBox.Text.Trim()
         Smoke = ($ChkSmoke.IsChecked -eq $true)
-        BundleDesktop = ($ChkDesktop.IsChecked -eq $true)
+        DesktopMode = $desktopMode
+        PortableDesktopArchive = $portableDesktopArchive
         Workdir = $WorkdirBox.Text.Trim()
         Companion = ($ChkCompanion.IsChecked -eq $true)
         AutoStart = ($ChkStartup.IsChecked -eq $true)
@@ -846,6 +944,10 @@ function Test-FormInput {
     }
     if ($ChkCompanion.IsChecked -eq $true -and (-not (Test-Path -LiteralPath $WorkdirBox.Text.Trim() -PathType Container))) {
         $FormStatus.Text = '请选择一个存在的手机远程项目目录'; return $false
+    }
+    if ($DesktopPortableMode.IsChecked -eq $true -and
+        ([string]::IsNullOrWhiteSpace($portableDesktopArchive) -or -not (Test-Path -LiteralPath $portableDesktopArchive -PathType Leaf))) {
+        $FormStatus.Text = '当前安装包不含便携桌面版，请选择本机官方版或仅终端'; return $false
     }
     $FormStatus.Text = ''
     return $true
@@ -960,6 +1062,8 @@ $timer.Add_Tick({
                 $m = $sync.Summary.Model
                 $sub = '模型: ' + $m + '   ·   安装位置: ' + $LauncherRoot
                 if (-not $sync.Summary.DesktopExe) { $sub = $sub + [Environment]::NewLine + '（本次使用终端模式）' }
+                elseif ($sync.Summary.DesktopKind -eq 'portable') { $sub = $sub + [Environment]::NewLine + '（使用安装包内置便携桌面版，不自动更新）' }
+                else { $sub = $sub + [Environment]::NewLine + '（使用本机官方 Codex Desktop）' }
                 $DoneSub.Text = $sub
                 $DoneShortcuts.Text = [string]$sync.Summary.Shortcuts
                 if ($sync.Summary.DesktopTarget) {

@@ -1,12 +1,18 @@
 param(
-    [string]$Version = '2.2.0',
+    [string]$Version = '2.3.0',
     [string]$OutputDir = '',
     [switch]$BuildFull,
-    [string]$CodexArchive = ''
+    [string]$CodexArchive = '',
+    [switch]$BuildPortableDesktop,
+    [string]$PortableDesktopDir = ''
 )
 
 $ErrorActionPreference = 'Stop'
+$PortableDesktopMagic = 'FLUXGATE_PORTABLE_DESKTOP_V1'
 $root = Split-Path -Parent $PSScriptRoot
+if ($BuildPortableDesktop) {
+    $BuildFull = $true
+}
 if (-not $OutputDir) {
     $OutputDir = Join-Path $root 'release-assets'
 }
@@ -72,6 +78,8 @@ if (-not $csc) {
 $exeName = "FluxGate-Codex-Launcher_$Version.exe"
 $exePath = Join-Path $OutputDir $exeName
 $fullExePath = Join-Path $OutputDir "FluxGate-Codex-Full_$Version.exe"
+$portableExePath = Join-Path $OutputDir "FluxGate-Codex-Desktop-Portable_$Version.exe"
+$portableManifestPath = Join-Path $OutputDir "FluxGate-Codex-Desktop-Portable_$Version.json"
 $source = Join-Path $root 'src\LauncherBootstrapper.cs'
 $companionSource = Join-Path $root 'src\Companion.cs'
 $guiScript = Join-Path $root 'installer\FluxGate-Codex-Setup-GUI.ps1'
@@ -80,6 +88,8 @@ $notice = Join-Path $root 'NOTICE'
 $thirdPartyLicenses = Join-Path $root 'THIRD-PARTY-LICENSES.md'
 $companionExe = Join-Path ([IO.Path]::GetTempPath()) ('FluxGate-Codex-Companion-' + [guid]::NewGuid().ToString('N') + '.exe')
 $temporaryCodexArchive = $null
+$temporaryDesktopArchive = $null
+$temporaryDesktopManifest = $null
 
 try {
     & $csc /nologo /target:winexe /platform:anycpu /optimize+ "/win32icon:$icon" `
@@ -113,17 +123,33 @@ try {
         throw 'Launcher EXE build failed'
     }
 
-    & $exePath --self-test
-    if ($LASTEXITCODE -ne 0) {
-        throw 'Launcher EXE embedded-resource self-test failed'
+    $launcherSelfTest = Start-Process -FilePath $exePath -ArgumentList '--self-test' -Wait -PassThru
+    if ($launcherSelfTest.ExitCode -ne 0) {
+        throw "Launcher EXE embedded-resource self-test failed with exit code $($launcherSelfTest.ExitCode)"
     }
 
     if ($BuildFull) {
         $archivePath = $CodexArchive
         if ([string]::IsNullOrWhiteSpace($archivePath)) {
             [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
-            $release = Invoke-RestMethod -Uri 'https://api.github.com/repos/openai/codex/releases/latest' `
-                -Headers @{ 'User-Agent' = 'fluxgate-release-builder' } -TimeoutSec 60
+            $release = $null
+            $gh = Get-Command 'gh.exe' -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($gh) {
+                try {
+                    $releaseJson = & $gh.Source api 'repos/openai/codex/releases/latest' 2>$null | Out-String
+                    if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($releaseJson)) {
+                        $release = $releaseJson | ConvertFrom-Json
+                    }
+                } catch {}
+            }
+            if (-not $release) {
+                $releaseHeaders = @{ 'User-Agent' = 'fluxgate-release-builder' }
+                if (-not [string]::IsNullOrWhiteSpace($env:GH_TOKEN)) {
+                    $releaseHeaders.Authorization = 'Bearer ' + $env:GH_TOKEN
+                }
+                $release = Invoke-RestMethod -Uri 'https://api.github.com/repos/openai/codex/releases/latest' `
+                    -Headers $releaseHeaders -TimeoutSec 60
+            }
             $assetName = 'codex-x86_64-pc-windows-msvc.exe.zip'
             $asset = $release.assets | Where-Object { $_.name -eq $assetName } | Select-Object -First 1
             if (-not $asset) { throw "Official Codex CLI asset not found: $assetName" }
@@ -169,15 +195,179 @@ try {
         if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $fullExePath)) {
             throw 'Full Launcher EXE build failed'
         }
-        & $fullExePath --self-test-full
-        if ($LASTEXITCODE -ne 0) {
-            throw 'Full Launcher EXE embedded-resource self-test failed'
+        $fullSelfTest = Start-Process -FilePath $fullExePath -ArgumentList '--self-test-full' -Wait -PassThru
+        if ($fullSelfTest.ExitCode -ne 0) {
+            throw "Full Launcher EXE embedded-resource self-test failed with exit code $($fullSelfTest.ExitCode)"
+        }
+
+        if ($BuildPortableDesktop) {
+            $desktopSource = $PortableDesktopDir
+            $desktopPackageName = ''
+            $desktopPackageVersion = ''
+            if ([string]::IsNullOrWhiteSpace($desktopSource)) {
+                $desktopPackage = Get-AppxPackage -Name 'OpenAI.Codex' -ErrorAction SilentlyContinue |
+                    Sort-Object Version -Descending | Select-Object -First 1
+                if (-not $desktopPackage) {
+                    throw 'OpenAI.Codex is not installed. Pass -PortableDesktopDir with the Desktop app directory.'
+                }
+                $desktopSource = Join-Path $desktopPackage.InstallLocation 'app'
+                $desktopPackageName = [string]$desktopPackage.PackageFullName
+                $desktopPackageVersion = [string]$desktopPackage.Version
+            }
+            $desktopSource = [IO.Path]::GetFullPath($desktopSource)
+            if (Test-Path -LiteralPath (Join-Path $desktopSource 'app\ChatGPT.exe') -PathType Leaf) {
+                $desktopSource = Join-Path $desktopSource 'app'
+            }
+            if (-not (Test-Path -LiteralPath $desktopSource -PathType Container)) {
+                throw "Portable Desktop source directory not found: $desktopSource"
+            }
+            foreach ($requiredRelativePath in @(
+                'ChatGPT.exe',
+                'resources\app.asar',
+                'resources\codex.exe'
+            )) {
+                if (-not (Test-Path -LiteralPath (Join-Path $desktopSource $requiredRelativePath) -PathType Leaf)) {
+                    throw "Portable Desktop source is missing $requiredRelativePath"
+                }
+            }
+
+            $reparsePoint = Get-ChildItem -LiteralPath $desktopSource -Recurse -Force -ErrorAction Stop |
+                Where-Object { $_.Attributes -band [IO.FileAttributes]::ReparsePoint } |
+                Select-Object -First 1
+            if ($reparsePoint) {
+                throw "Portable Desktop source contains a reparse point: $($reparsePoint.FullName)"
+            }
+            $desktopFiles = @(Get-ChildItem -LiteralPath $desktopSource -File -Recurse -Force -ErrorAction Stop)
+            if ($desktopFiles.Count -lt 100) {
+                throw 'Portable Desktop source is unexpectedly small'
+            }
+            $desktopBytes = ($desktopFiles | Measure-Object Length -Sum).Sum
+            if ($desktopBytes -lt 500MB) {
+                throw 'Portable Desktop source payload is unexpectedly small'
+            }
+            if ([string]::IsNullOrWhiteSpace($desktopPackageVersion)) {
+                $desktopPackageVersion = [Diagnostics.FileVersionInfo]::GetVersionInfo(
+                    (Join-Path $desktopSource 'ChatGPT.exe')).ProductVersion
+            }
+            if ([string]::IsNullOrWhiteSpace($desktopPackageName)) {
+                $desktopPackageName = 'locally-supplied-portable-copy'
+            }
+
+            $temporaryDesktopArchive = Join-Path ([IO.Path]::GetTempPath()) ('fluxgate-portable-desktop-' + [guid]::NewGuid().ToString('N') + '.zip')
+            $temporaryDesktopManifest = Join-Path ([IO.Path]::GetTempPath()) ('fluxgate-portable-desktop-' + [guid]::NewGuid().ToString('N') + '.json')
+            $desktopManifest = [ordered]@{
+                format = 1
+                product = 'Codex Desktop portable copy'
+                source_package = $desktopPackageName
+                source_version = $desktopPackageVersion
+                architecture = 'x64'
+                built_at_utc = [DateTime]::UtcNow.ToString('o')
+                file_count = $desktopFiles.Count
+                uncompressed_bytes = [int64]$desktopBytes
+                main_executable = 'desktop-app/ChatGPT.exe'
+                update_policy = 'manual replacement only'
+                user_data_included = $false
+            }
+            Set-Content -LiteralPath $temporaryDesktopManifest -Value ($desktopManifest | ConvertTo-Json -Depth 4) -Encoding UTF8
+
+            Add-Type -AssemblyName System.IO.Compression, System.IO.Compression.FileSystem
+            $desktopZip = [IO.Compression.ZipFile]::Open($temporaryDesktopArchive, [IO.Compression.ZipArchiveMode]::Create)
+            try {
+                foreach ($file in $desktopFiles) {
+                    $relativePath = $file.FullName.Substring($desktopSource.Length).TrimStart('\')
+                    $entryName = 'desktop-app/' + $relativePath.Replace('\', '/')
+                    [IO.Compression.ZipFileExtensions]::CreateEntryFromFile(
+                        $desktopZip,
+                        $file.FullName,
+                        $entryName,
+                        [IO.Compression.CompressionLevel]::Optimal) | Out-Null
+                }
+                [IO.Compression.ZipFileExtensions]::CreateEntryFromFile(
+                    $desktopZip,
+                    $temporaryDesktopManifest,
+                    'portable-desktop-manifest.json',
+                    [IO.Compression.CompressionLevel]::Optimal) | Out-Null
+            } finally {
+                $desktopZip.Dispose()
+            }
+
+            $desktopZip = [IO.Compression.ZipFile]::OpenRead($temporaryDesktopArchive)
+            try {
+                $desktopEntryNames = @($desktopZip.Entries | ForEach-Object { $_.FullName })
+                foreach ($requiredEntry in @(
+                    'desktop-app/ChatGPT.exe',
+                    'desktop-app/resources/app.asar',
+                    'desktop-app/resources/codex.exe',
+                    'portable-desktop-manifest.json'
+                )) {
+                    if ($desktopEntryNames -notcontains $requiredEntry) {
+                        throw "Portable Desktop archive is missing $requiredEntry"
+                    }
+                }
+                $privateEntry = $desktopZip.Entries | Where-Object {
+                    $_.FullName -match '(?i)(^|/)(auth\.json|cookies?|local state|user data)(/|$)'
+                } | Select-Object -First 1
+                if ($privateEntry) {
+                    throw "Portable Desktop archive contains user data: $($privateEntry.FullName)"
+                }
+            } finally {
+                $desktopZip.Dispose()
+            }
+
+            Copy-Item -LiteralPath $fullExePath -Destination $portableExePath -Force
+            $payloadHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $temporaryDesktopArchive).Hash
+            $digestBytes = New-Object byte[] 32
+            for ($index = 0; $index -lt $digestBytes.Length; $index++) {
+                $digestBytes[$index] = [Convert]::ToByte($payloadHash.Substring($index * 2, 2), 16)
+            }
+            $magicBytes = [Text.Encoding]::ASCII.GetBytes($PortableDesktopMagic)
+            $payloadStream = [IO.File]::OpenRead($temporaryDesktopArchive)
+            $portableStream = [IO.File]::Open($portableExePath, [IO.FileMode]::Open, [IO.FileAccess]::Write, [IO.FileShare]::None)
+            try {
+                $portableStream.Seek(0, [IO.SeekOrigin]::End) | Out-Null
+                $payloadStream.CopyTo($portableStream)
+                $lengthBytes = [BitConverter]::GetBytes([int64]$payloadStream.Length)
+                $portableStream.Write($lengthBytes, 0, $lengthBytes.Length)
+                $portableStream.Write($digestBytes, 0, $digestBytes.Length)
+                $portableStream.Write($magicBytes, 0, $magicBytes.Length)
+            } finally {
+                $payloadStream.Dispose()
+                $portableStream.Dispose()
+            }
+            if ((Get-Item -LiteralPath $portableExePath).Length -ge 2GB) {
+                throw 'Portable Desktop EXE exceeds the GitHub Releases 2 GB per-file limit'
+            }
+            $portableSelfTest = Start-Process -FilePath $portableExePath -ArgumentList '--self-test-portable' -Wait -PassThru
+            if ($portableSelfTest.ExitCode -ne 0) {
+                throw "Portable Desktop EXE self-test failed with exit code $($portableSelfTest.ExitCode)"
+            }
+
+            $artifact = Get-Item -LiteralPath $portableExePath
+            $releaseManifest = [ordered]@{
+                artifact = $artifact.Name
+                artifact_bytes = [int64]$artifact.Length
+                artifact_sha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $artifact.FullName).Hash.ToLowerInvariant()
+                portable_payload_bytes = [int64](Get-Item -LiteralPath $temporaryDesktopArchive).Length
+                portable_payload_sha256 = $payloadHash.ToLowerInvariant()
+                source_package = $desktopPackageName
+                source_version = $desktopPackageVersion
+                architecture = 'x64'
+                update_policy = 'manual replacement only'
+                user_data_included = $false
+            }
+            Set-Content -LiteralPath $portableManifestPath -Value ($releaseManifest | ConvertTo-Json -Depth 4) -Encoding UTF8
         }
     }
 } finally {
     Remove-Item -LiteralPath $companionExe -Force -ErrorAction SilentlyContinue
     if ($temporaryCodexArchive) {
         Remove-Item -LiteralPath $temporaryCodexArchive -Force -ErrorAction SilentlyContinue
+    }
+    if ($temporaryDesktopArchive) {
+        Remove-Item -LiteralPath $temporaryDesktopArchive -Force -ErrorAction SilentlyContinue
+    }
+    if ($temporaryDesktopManifest) {
+        Remove-Item -LiteralPath $temporaryDesktopManifest -Force -ErrorAction SilentlyContinue
     }
 }
 
