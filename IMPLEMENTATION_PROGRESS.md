@@ -1,7 +1,15 @@
 # Implementation Progress
 
 ## Current Focus
-- Publish the validated v2.3.0 Portable Desktop implementation and paired offline artifact.
+- v2.3.0 Portable Desktop is published; monitor first-run installation feedback on additional Windows x64 machines.
+
+## Latest Update - 2026-08-02 23:05
+- Scope: Publish v2.3.0 source, normal release assets, and the locally built fixed-version Portable Desktop edition.
+- Completed: Pushed source commit `e8455cb` to `main`, tagged `v2.3.0`, completed GitHub Actions run `30752481868`, and uploaded `FluxGate-Codex-Desktop-Portable_2.3.0.exe` with its JSON provenance/hash manifest to `https://github.com/CuizXuan/fluxgate-codex-launcher/releases/tag/v2.3.0`.
+- Validation: GitHub Actions rebuilt and validated the normal Launcher/Full assets. GitHub Release reports the Portable asset as 855,639,098 bytes with server digest `sha256:1cac3c055380a98fe12df672161bd2f1b636a151a644af7aa7d85cd8746677cd`, exactly matching the local manifest. The local published artifact passed `--self-test-portable`, archive inspection, and ordinary-directory runtime launch before upload.
+- Problems / Blockers: A redundant full download through `gh release download` made no file progress for 16 minutes and was terminated; no partial file or process was retained. Server-side Release size/digest verification succeeded, so this is recorded as a CDN/client transfer limitation rather than an artifact mismatch.
+- Not Done: No source or release work remains for v2.3.0. A second-machine public-download/install check remains useful when another clean Windows x64 machine is available.
+- Next: Direct offline users to the explicitly labeled Portable asset and retain Full for Store-backed Desktop installation.
 
 ## Latest Update - 2026-08-02 22:33
 - Scope: Add a locally sourced, version-pinned Codex Desktop payload for users who choose the FluxGateAI portable copy instead of Microsoft Store installation.
